@@ -32,4 +32,4 @@ Our purpose is to create a highly robust trading strategy. So we use an ensemble
 * Step 3. After validation, we only use the best model which has the highest Sharpe ratio to predict and trade for the next quarter.
 
 ## Performance
-<img src=figs/performance.png width="500">
+<img src=figs/performance.png>
