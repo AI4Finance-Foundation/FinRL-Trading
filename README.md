@@ -27,9 +27,9 @@ The stock data we use is pulled from [Compustat database via Wharton Research Da
 
 ### Ensemble Method
 Our purpose is to create a highly robust trading strategy. So we use an ensemble method to automatically select the best performing agent among PPO, A2C, and DDPG to trade based on the Sharpe ratio. The ensemble process is described as follows:
-* Step 1. We use a growing window of 𝑛 months to retrain our three agents concurrently. In this paper we retrain our three agents at every 3 months.
-* Step 2. We validate all 3 agents by using a 12-month validation- rolling window followed by the growing window we used for train- ing to pick the best performing agent which has the highest Sharpe ratio. We also adjust risk-aversion by using turbulence index in our validation stage.
-* Step 3. After validation, we only use the best model which has the highest Sharpe ratio to predict and trade for the next quarter.
+* __Step 1__. We use a growing window of 𝑛 months to retrain our three agents concurrently. In this paper we retrain our three agents at every 3 months.
+* __Step 2__. We validate all 3 agents by using a 12-month validation- rolling window followed by the growing window we used for train- ing to pick the best performing agent which has the highest Sharpe ratio. We also adjust risk-aversion by using turbulence index in our validation stage.
+* __Step 3__. After validation, we only use the best model which has the highest Sharpe ratio to predict and trade for the next quarter.
 
 ## Performance
 <img src=figs/performance.png>
