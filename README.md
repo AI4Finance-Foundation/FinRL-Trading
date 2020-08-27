@@ -41,6 +41,7 @@ source venv/bin/activate
 
 The scripte has been tested running under Python >= 3.6.0, with the folowing packages installed:
 
+Under virtualenv (venv):
 ```shell
 pip install -r requirements.txt
 ```
