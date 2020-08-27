@@ -16,6 +16,14 @@ Hongyang Yang, Xiao-Yang Liu, Shan Zhong, and Anwar Walid. 2020. Deep Reinforcem
 ```shell
 git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020.git
 ```
+## Dependencies
+
+The scripte has been tested running under Python >= 3.6.0, with the folowing packages installed:
+
+```shell
+pip install -r requirements.txt
+```
+
 ## Run DRL Ensemble Strategy
 ```shell
 python run_DRL.py
