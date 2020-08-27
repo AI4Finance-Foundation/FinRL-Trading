@@ -34,7 +34,7 @@ def run_model() -> None:
 
     ## model training
     print("==============Model Training===========")
-    model = train_A2C(env_train, model_name = "A2C_80k_spy", timesteps=80000)
+    model = train_PPO(env_train, model_name = "PPO_200k_dow", timesteps=200000)
 
     print("==============Model Prediction===========")
     for i in range(len(test.index.unique())):
