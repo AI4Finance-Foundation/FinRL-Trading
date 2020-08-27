@@ -16,6 +16,26 @@ Hongyang Yang, Xiao-Yang Liu, Shan Zhong, and Anwar Walid. 2020. Deep Reinforcem
 ```shell
 git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020.git
 ```
+
+## Create and Activate Virtual Environment
+cd into this repository
+```bash
+cd Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
+```
+Under folder /Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020, create a virtual environment
+```bash
+pip install virtualenv
+```
+Virtualenvs are essentially folders that have copies of python executable and all python packages. Virtualenvs can also avoid packages conflict.
+Create a virtualenv called venv under folder /Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
+```bash
+virtualenv -p python3 venv
+```
+To activate a virtualenv:
+```
+source venv/bin/activate
+```
+    
 ## Dependencies
 
 The scripte has been tested running under Python >= 3.6.0, with the folowing packages installed:
