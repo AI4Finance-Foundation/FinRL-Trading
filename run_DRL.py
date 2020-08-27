@@ -5,7 +5,7 @@ import time
 from stable_baselines.common.vec_env import DummyVecEnv
 
 # customized env
-from env.EnvSingleStock import StockEnv
+from env.StockTradingRLEnv import StockEnv
 # preprocessor
 from preprocessing.preprocessors import *
 # config
