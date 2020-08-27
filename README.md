@@ -53,7 +53,7 @@ python run_DRL.py
 
 ## Data
 The stock data we use is pulled from [Compustat database via Wharton Research Data Services](https://wrds-web.wharton.upenn.edu/wrds/ds/compd/fundq).
-<img src=figs/data.PNG>
+<img src=figs/data.PNG width="500" height="600">
 
 ### Ensemble Method
 Our purpose is to create a highly robust trading strategy. So we use an ensemble method to automatically select the best performing agent among PPO, A2C, and DDPG to trade based on the Sharpe ratio. The ensemble process is described as follows:
