@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pickle
 
 # shares normalization factor
-HMAX_NORMALIZE = 10
+HMAX_NORMALIZE = 30
 # initial amount of money we have in our account
 INITIAL_ACCOUNT_BALANCE=1000000
 # total number of stocks in our portfolio
