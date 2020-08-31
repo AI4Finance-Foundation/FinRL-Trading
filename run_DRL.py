@@ -24,8 +24,8 @@ def run_model() -> None:
     df = add_turbulence(df)
 
     # divide train and test
-    train = data_split(df, start=20090000, end=20170000)
-    test = data_split(df, start=20170000, end=20200512)
+    train = data_split(df, start=20090000, end=20160000)
+    test = data_split(df, start=20160000, end=20200512)
 
     ## set up train & test environment
     # training env
