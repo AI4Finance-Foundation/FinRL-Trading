@@ -46,6 +46,18 @@ Under virtualenv (venv):
 ```shell
 pip install -r requirements.txt
 ```
+## Status
+
+<details><summary><b>Version History</b> <i>[click to expand]</i></summary>
+<div>
+
+* 1.0.1
+	Changes:
+	* 
+* 0.0.1
+    Simple version
+</div>
+</details>
 
 ## Run DRL Ensemble Strategy
 ```shell
