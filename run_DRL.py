@@ -16,7 +16,9 @@ from model.models import *
 
 def run_model() -> None:
     """Train the model."""
-
+    ## version 0.0.1
+    ## ensemble strategy will be added in the next version
+    
     # read and preprocess data
     df = preprocess_data()
     df = add_turbulence(df)
