@@ -46,6 +46,12 @@ Under virtualenv (venv):
 ```shell
 pip install -r requirements.txt
 ```
+
+## Run DRL Ensemble Strategy
+```shell
+python run_DRL.py
+```
+
 ## Status
 
 <details><summary><b>Version History</b> <i>[click to expand]</i></summary>
@@ -58,11 +64,6 @@ pip install -r requirements.txt
     Simple version
 </div>
 </details>
-
-## Run DRL Ensemble Strategy
-```shell
-python run_DRL.py
-```
 
 ## Data
 The stock data we use is pulled from [Compustat database via Wharton Research Data Services](https://wrds-web.wharton.upenn.edu/wrds/ds/compd/fundq).
