@@ -4,8 +4,6 @@ import numpy as np
 import time
 from stable_baselines.common.vec_env import DummyVecEnv
 
-# customized env
-from env.StockTradingRLEnv import StockEnv
 # preprocessor
 from preprocessing.preprocessors import *
 # config
@@ -16,37 +14,28 @@ from model.models import *
 
 def run_model() -> None:
     """Train the model."""
-    ## version 0.0.1
-    ## ensemble strategy will be added in the next version
-    
+
     # read and preprocess data
-    df = preprocess_data()
-    df = add_turbulence(df)
+    data = preprocess_data()
+    data = add_turbulence(data)
 
-    # divide train and test
-    train = data_split(df, start=20090000, end=20160000)
-    test = data_split(df, start=20160000, end=20200512)
+    # 2015/10/01 is the date that validation starts
+    # 2016/01/01 is the date that real trading starts
+    # unique_trade_date needs to start from 2015/10/01 for validation purpose
+    unique_trade_date = data[(data.datadate > 20151001)&(data.datadate <= 20200707)].datadate.unique()
 
-    ## set up train & test environment
-    # training env
-    env_train = DummyVecEnv([lambda: StockEnv(train)])
-    # testing env
-    env_test = DummyVecEnv([lambda: StockEnv(test)])
-    obs_test = env_test.reset()
-
-    ## model training
-    print("==============Model Training===========")
-    model = train_PPO(env_train, model_name = "PPO_200k_dow", timesteps=200000)
-
-    print("==============Model Prediction===========")
-    for i in range(len(test.index.unique())):
-        action, _states = model.predict(obs_test)
-        obs_test, rewards, dones, info = env_test.step(action)
-        env_test.render()
+    # rebalance_window is the number of months that we want to retrain our model
+    # validation_window is the numebr of months that we want to test our model
+    rebalance_window = 63
+    validation_window = 63
+    
+    ## Ensemble Strategy
+    run_ensemble_strategy(df=data, 
+                          unique_trade_date= unique_trade_date,
+                          rebalance_window = rebalance_window,
+                          validation_window=validation_window)
 
     #_logger.info(f"saving model version: {_version}")
-    #save_pipeline(pipeline_to_persist=pipeline.price_pipe)
-
 
 if __name__ == "__main__":
     run_model()

@@ -10,7 +10,7 @@ import pickle
 
 # shares normalization factor
 # 100 shares per trade
-HMAX_NORMALIZE = 30
+HMAX_NORMALIZE = 100
 # initial amount of money we have in our account
 INITIAL_ACCOUNT_BALANCE=1000000
 # total number of stocks in our portfolio
@@ -94,25 +94,25 @@ class StockEnvTrain(gym.Env):
 
         if self.terminal:
             plt.plot(self.asset_memory,'r')
-            plt.savefig('account_value_train.png')
+            plt.savefig('results/account_value_train.png')
             plt.close()
             end_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(STOCK_DIM+1)])*np.array(self.state[(STOCK_DIM+1):(STOCK_DIM*2+1)]))
             
             #print("end_total_asset:{}".format(end_total_asset))
             df_total_value = pd.DataFrame(self.asset_memory)
-            df_total_value.to_csv('account_value_train.csv')
+            df_total_value.to_csv('results/account_value_train.csv')
             #print("total_reward:{}".format(self.state[0]+sum(np.array(self.state[1:(STOCK_DIM+1)])*np.array(self.state[(STOCK_DIM+1):61]))- INITIAL_ACCOUNT_BALANCE ))
             #print("total_cost: ", self.cost)
             #print("total_trades: ", self.trades)
             df_total_value.columns = ['account_value']
             df_total_value['daily_return']=df_total_value.pct_change(1)
-            sharpe = (62**0.5)*df_total_value['daily_return'].mean()/ \
+            sharpe = (252**0.5)*df_total_value['daily_return'].mean()/ \
                   df_total_value['daily_return'].std()
             #print("Sharpe: ",sharpe)
             #print("=================================")
             df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.to_csv('account_rewards_train.csv')
+            #df_rewards.to_csv('results/account_rewards_train.csv')
             
             # print('total asset: {}'.format(self.state[0]+ sum(np.array(self.state[1:29])*np.array(self.state[29:]))))
             #with open('obs.pkl', 'wb') as f:  
