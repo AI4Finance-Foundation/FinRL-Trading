@@ -10,7 +10,7 @@ import pickle
 
 # shares normalization factor
 # 100 shares per trade
-HMAX_NORMALIZE = 30
+HMAX_NORMALIZE = 100
 # initial amount of money we have in our account
 INITIAL_ACCOUNT_BALANCE=1000000
 # total number of stocks in our portfolio
@@ -18,8 +18,8 @@ STOCK_DIM = 30
 # transaction fee: 1/1000 reasonable percentage
 TRANSACTION_FEE_PERCENT = 0.001
 
-# turbulence index: 150 reasonable threshold
-#TURBULENCE_THRESHOLD = 150
+# turbulence index: 90-150 reasonable threshold
+#TURBULENCE_THRESHOLD = 140
 
 
 class StockEnvTrade(gym.Env):
@@ -27,7 +27,7 @@ class StockEnvTrade(gym.Env):
     metadata = {'render.modes': ['human']}
 
     def __init__(self, df,day = 0,turbulence_threshold=140
-                 ,initial=True, previous_state=[], iteration=''):
+                 ,initial=True, previous_state=[], model_name='', iteration=''):
         #super(StockEnv, self).__init__()
         #money = 10 , scope = 1
         self.day = day
@@ -61,7 +61,7 @@ class StockEnvTrade(gym.Env):
         self.rewards_memory = []
         #self.reset()
         self._seed()
-        
+        self.model_name=model_name        
         self.iteration=iteration
 
 
@@ -119,10 +119,10 @@ class StockEnvTrade(gym.Env):
 
         if self.terminal:
             plt.plot(self.asset_memory,'r')
-            plt.savefig('results/account_value_trade_{}.png'.format(self.iteration))
+            plt.savefig('results/account_value_trade_{}_{}.png'.format(self.model_name, self.iteration))
             plt.close()
             df_total_value = pd.DataFrame(self.asset_memory)
-            df_total_value.to_csv('results/account_value_trade_{}.csv'.format(self.iteration))
+            df_total_value.to_csv('results/account_value_trade_{}_{}.csv'.format(self.model_name, self.iteration))
             end_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(STOCK_DIM+1)])*np.array(self.state[(STOCK_DIM+1):(STOCK_DIM*2+1)]))
             print("previous_total_asset:{}".format(self.asset_memory[0]))           
@@ -134,12 +134,12 @@ class StockEnvTrade(gym.Env):
 
             df_total_value.columns = ['account_value']
             df_total_value['daily_return']=df_total_value.pct_change(1)
-            sharpe = (63**0.5)*df_total_value['daily_return'].mean()/ \
+            sharpe = (4**0.5)*df_total_value['daily_return'].mean()/ \
                   df_total_value['daily_return'].std()
             print("Sharpe: ",sharpe)
             
             df_rewards = pd.DataFrame(self.rewards_memory)
-            df_rewards.to_csv('results/account_rewards_trade_{}.csv'.format(self.iteration))
+            df_rewards.to_csv('results/account_rewards_trade_{}_{}.csv'.format(self.model_name, self.iteration))
             
             # print('total asset: {}'.format(self.state[0]+ sum(np.array(self.state[1:29])*np.array(self.state[29:]))))
             #with open('obs.pkl', 'wb') as f:  
@@ -152,7 +152,9 @@ class StockEnvTrade(gym.Env):
 
             actions = actions * HMAX_NORMALIZE
             #actions = (actions.astype(int))
-            
+            if self.turbulence>=self.turbulence_threshold:
+                actions=np.array([-HMAX_NORMALIZE]*STOCK_DIM)
+                
             begin_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(STOCK_DIM+1)])*np.array(self.state[(STOCK_DIM+1):(STOCK_DIM*2+1)]))
             #print("begin_total_asset:{}".format(begin_total_asset))
@@ -245,6 +247,7 @@ class StockEnvTrade(gym.Env):
     
     def render(self, mode='human',close=False):
         return self.state
+    
 
     def _seed(self, seed=None):
         self.np_random, seed = seeding.np_random(seed)
