@@ -63,8 +63,7 @@ Use Quantopian's [pyfolio package](https://github.com/quantopian/pyfolio) to do 
 <div>
 
 * 1.0.1
-	Changes:
-	* 
+	Changes: added ensemble strategy
 * 0.0.1
     Simple version
 </div>
