@@ -51,6 +51,11 @@ pip install -r requirements.txt
 ```shell
 python run_DRL.py
 ```
+## Backtesting
+
+Use Quantopian's [pyfolio package](https://github.com/quantopian/pyfolio) to do the backtesting.
+
+[Backtesting script](backtesting.ipynb)
 
 ## Status
 
