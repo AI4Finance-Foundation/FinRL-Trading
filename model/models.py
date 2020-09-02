@@ -116,9 +116,6 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
     # for ensemble model, it's necessary to feed the last state
     # of the previous model to the current model as the intial state
     last_state_ensemble = []
-    last_state_ppo = []
-    last_state_a2c = []
-    last_state_ddpg = []
 
     ppo_sharpe_list = []
     ddpg_sharpe_list = []
