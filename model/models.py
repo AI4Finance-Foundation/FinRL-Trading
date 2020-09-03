@@ -139,7 +139,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
             initial = False
 
         # Tuning trubulence index based on historical data
-        # TODO: use a dynamic model, like moving-average or linear regression to tune the turbulence index
+        # TODO: need a more dynamic model
         # 2018-2019
         if (i >= 692) & (i < 1090):
             turbulence_threshold = 100
