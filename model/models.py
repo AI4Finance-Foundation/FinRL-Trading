@@ -143,7 +143,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         # 2018-2019
         if (i >= 692) & (i < 1090):
             turbulence_threshold = 100
-            # 2020
+        # 2020
         if i >= 1090:
             turbulence_threshold = 90
 
