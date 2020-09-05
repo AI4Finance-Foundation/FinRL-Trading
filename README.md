@@ -16,6 +16,7 @@ Hongyang Yang, Xiao-Yang Liu, Shan Zhong, and Anwar Walid. 2020. Deep Reinforcem
 git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020.git
 ```
 
+
 ## Create and Activate Virtual Environment
 cd into this repository
 ```bash
@@ -37,6 +38,24 @@ To activate a virtualenv:
 ```
 source venv/bin/activate
 ```
+### Prerequisites
+Baselines requires p**ython3 (>=3.6.0)** with the development headers. You'll also need system packages CMake, OpenMPI and zlib. Those can be installed as follows
+
+#### Ubuntu
+
+```bash
+sudo apt-get update && sudo apt-get install cmake libopenmpi-dev python3-dev zlib1g-dev
+```
+
+#### Mac OS X
+Installation of system packages on Mac requires [Homebrew](https://brew.sh). With Homebrew installed, run the following:
+```bash
+brew install cmake openmpi
+```
+
+#### Windows 10
+
+To install stable-baselines on Windows, please look at the [documentation](https://stable-baselines.readthedocs.io/en/master/guide/install.html#prerequisites).
     
 ## Dependencies
 
