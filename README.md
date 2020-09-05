@@ -19,7 +19,7 @@ git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Auto
 
 
 ### Prerequisites
-OpenAI Baselines requires p**ython3 (>=3.6.0)** with the development headers. You'll also need system packages CMake, OpenMPI and zlib. Those can be installed as follows
+You'll need system packages CMake, OpenMPI and zlib. Those can be installed as follows
 
 #### Ubuntu
 
