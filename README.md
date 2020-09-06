@@ -39,7 +39,7 @@ To install stable-baselines on Windows, please look at the [documentation](https
     
 ## Dependencies
 
-The scripte has been tested running under **Python >= 3.6.0**, with the folowing packages installed:
+The script has been tested running under **Python >= 3.6.0**, with the folowing packages installed:
 
 Under virtualenv (venv):
 ```shell
