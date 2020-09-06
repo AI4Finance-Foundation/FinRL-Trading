@@ -37,14 +37,6 @@ brew install cmake openmpi
 
 To install stable-baselines on Windows, please look at the [documentation](https://stable-baselines.readthedocs.io/en/master/guide/install.html#prerequisites).
     
-## Dependencies
-
-The script has been tested running under **Python >= 3.6.0**, with the folowing packages installed:
-
-Under virtualenv (venv):
-```shell
-pip install -r requirements.txt
-```
 ## Create and Activate Virtual Environment
 cd into this repository
 ```bash
@@ -65,6 +57,15 @@ virtualenv -p python3 venv
 To activate a virtualenv:
 ```
 source venv/bin/activate
+```
+
+## Dependencies
+
+The script has been tested running under **Python >= 3.6.0**, with the folowing packages installed:
+
+Under virtualenv (venv):
+```shell
+pip install -r requirements.txt
 ```
 
 ## Run DRL Ensemble Strategy
