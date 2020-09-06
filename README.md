@@ -19,7 +19,7 @@ git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Auto
 
 
 ### Prerequisites
-You'll need system packages CMake, OpenMPI and zlib. Those can be installed as follows
+For OpenAI Baselines, you'll need system packages CMake, OpenMPI and zlib. Those can be installed as follows
 
 #### Ubuntu
 
