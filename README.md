@@ -50,7 +50,7 @@ Virtualenvs are essentially folders that have copies of python executable and al
 
 Virtualenvs can also avoid packages conflict.
 
-Create a virtualenv called venv under folder /Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
+Create a virtualenv **venv** under folder /Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
 ```bash
 virtualenv -p python3 venv
 ```
