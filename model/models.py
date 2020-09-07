@@ -71,7 +71,7 @@ def DRL_prediction(df,
                    rebalance_window,
                    turbulence_threshold,
                    initial):
-    ### make a prediction ### 
+    ### make a prediction based on trained model### 
 
     ## trading env
     trade_data = data_split(df, start=unique_trade_date[iter_num - rebalance_window], end=unique_trade_date[iter_num])
@@ -96,12 +96,14 @@ def DRL_prediction(df,
 
 
 def DRL_validation(model, test_data, test_env, test_obs) -> None:
+    ###validation process###
     for i in range(len(test_data.index.unique())):
         action, _states = model.predict(test_obs)
         test_obs, rewards, dones, info = test_env.step(action)
 
 
 def get_validation_sharpe(iteration):
+    ###Calculate Sharpe ratio based on validation results###
     df_total_value = pd.read_csv('results/account_value_validation_{}.csv'.format(iteration), index_col=0)
     df_total_value.columns = ['account_value_train']
     df_total_value['daily_return'] = df_total_value.pct_change(1)
@@ -114,7 +116,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
     """Ensemble Strategy that combines PPO, A2C and DDPG"""
     print("============Start Ensemble Strategy============")
     # for ensemble model, it's necessary to feed the last state
-    # of the previous model to the current model as the intial state
+    # of the previous model to the current model as the initial state
     last_state_ensemble = []
 
     ppo_sharpe_list = []
@@ -127,7 +129,6 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
     turbulence_threshold = 140
 
     start = time.time()
-    # for i in range(rebalance_window+validation_window, validation_window+rebalance_window*2 ,rebalance_window):
     for i in range(rebalance_window + validation_window, len(unique_trade_date), rebalance_window):
         print("============================================")
         ## initial state is empty
@@ -147,7 +148,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         if i >= 1090:
             turbulence_threshold = 90
 
-        ############## Setup Environment starts ##############
+        ############## Environment Setup starts ##############
         ## training env
         train = data_split(df, start=20090000, end=unique_trade_date[i - rebalance_window - validation_window])
         env_train = DummyVecEnv([lambda: StockEnvTrain(train)])
@@ -159,7 +160,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
                                                           turbulence_threshold=turbulence_threshold,
                                                           iteration=i)])
         obs_val = env_val.reset()
-        ############## Setup Environment ends ##############
+        ############## Environment Setup ends ##############
 
         ############## Training and Validation starts ##############
         print("======Model training from: ", 20090000, "to ",
