@@ -37,7 +37,7 @@ brew install cmake openmpi
 
 To install stable-baselines on Windows, please look at the [documentation](https://stable-baselines.readthedocs.io/en/master/guide/install.html#prerequisites).
     
-### Create and Activate Virtual Environment （Optional but highly recommended)
+### Create and Activate Virtual Environment (Optional but highly recommended)
 cd into this repository
 ```bash
 cd Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
