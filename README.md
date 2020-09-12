@@ -69,18 +69,20 @@ pip install -r requirements.txt
 
 ### Questions
 If you have questions regarding TensorFlow, note that tensorflow 2.0 is not compatible now, you may use
-    ```bash
-    pip install tensorflow==1.15.2
-    ```
+
+```bash
+pip install tensorflow==1.15.2
+ ```
+
 If you have questions regarding Stable-baselines package, please refer to [Stable-baselines installation guide](https://github.com/hill-a/stable-baselines). Install the Stable Baselines package using pip:
-    	```
-	pip install stable-baselines[mpi]
-	```
+```
+pip install stable-baselines[mpi]
+```
 
 This includes an optional dependency on MPI, enabling algorithms DDPG, GAIL, PPO1 and TRPO. If you do not need these algorithms, you can install without MPI:
-	```
-	pip install stable-baselines
-	```
+```
+pip install stable-baselines
+```
 
 Please read the [documentation](https://stable-baselines.readthedocs.io/) for more details and alternatives (from source, using docker).
 
