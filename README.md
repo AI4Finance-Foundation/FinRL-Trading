@@ -48,7 +48,7 @@ pip install virtualenv
 ```
 Virtualenvs are essentially folders that have copies of python executable and all python packages. 
 
-Virtualenvs can also avoid packages conflict.
+**Virtualenvs can also avoid packages conflict.**
 
 Create a virtualenv **venv** under folder /Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020
 ```bash
