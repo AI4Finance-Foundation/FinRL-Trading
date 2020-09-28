@@ -150,7 +150,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
 
         if historical_turbulence_mean > insample_turbulence_threshold:
             # if the mean of the historical data is greater than the 90% quantile of insample turbulence data
-            # then we assume that the current market is extremely volatile, 
+            # then we assume that the current market is volatile, 
             # therefore we set the 90% quantile of insample turbulence data as the turbulence threshold 
             # meaning the current turbulence can't exceed the 90% quantile of insample turbulence data
             turbulence_threshold = insample_turbulence_threshold
