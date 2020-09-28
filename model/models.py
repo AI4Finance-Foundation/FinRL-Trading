@@ -126,7 +126,10 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
     model_use = []
 
     # based on the analysis of the in-sample data
-    turbulence_threshold = 140
+    #turbulence_threshold = 140
+    insample_turbulence = df[(df.datadate<20151000) & (df.datadate>=20090000)]
+    insample_turbulence = insample_turbulence.drop_duplicates(subset=['datadate'])
+    insample_turbulence_threshold = np.quantile(historical_turbulence.turbulence.values, .90)
 
     start = time.time()
     for i in range(rebalance_window + validation_window, len(unique_trade_date), rebalance_window):
@@ -140,13 +143,22 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
             initial = False
 
         # Tuning trubulence index based on historical data
-        # TODO: need a more dynamic model
-        # 2018-2019
-        if (i >= 692) & (i < 1090):
-            turbulence_threshold = 100
-        # 2020
-        if i >= 1090:
-            turbulence_threshold = 90
+        # Turbulence lookback window is one quarter
+        historical_turbulence = df[(df.datadate<unique_trade_date[i - rebalance_window - validation_window]) & (df.datadate>=(unique_trade_date[i - rebalance_window - validation_window-63]))]
+        historical_turbulence = historical_turbulence.drop_duplicates(subset=['datadate'])
+        historical_turbulence_mean = np.mean(historical_turbulence.turbulence.values)   
+
+        if historical_turbulence_mean > insample_turbulence_threshold:
+            # if the mean of the historical data is greater than the 90% quantile of insample turbulence data
+            # then we assume that the current market is extremely volatile, 
+            # therefore we set the 90% quantile of insample turbulence data as the turbulence threshold 
+            # meaning the current turbulence can't exceed the 90% quantile of insample turbulence data
+            turbulence_threshold = insample_turbulence_threshold
+        else:
+            # if the mean of the historical data is less than the 90% quantile of insample turbulence data
+            # then we tune up the turbulence_threshold, meaning we lower the risk 
+            turbulence_threshold = np.quantile(insample_turbulence.turbulence.values, 0.99)
+        print("turbulence_threshold: ", turbulence_threshold)
 
         ############## Environment Setup starts ##############
         ## training env
