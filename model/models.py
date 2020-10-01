@@ -36,8 +36,8 @@ def train_A2C(env_train, model_name, timesteps=50000):
     return model
 
 
-def train_DDPG(env_train, model_name, timesteps=50000):
-    """DDPG model"""
+def train_TD3(env_train, model_name, timesteps=50000):
+    """TD3 model"""
 
     start = time.time()
     #model = DDPG('MlpPolicy', env_train)
@@ -49,6 +49,22 @@ def train_DDPG(env_train, model_name, timesteps=50000):
     print('Training time (DDPG): ', (end - start) / 60, ' minutes')
     return model
 
+
+def train_DDPG(env_train, model_name, timesteps=10000):
+    """DDPG model"""
+    # the noise objects for DDPG
+    n_actions = env_train.action_space.shape[-1]
+    param_noise = None
+    action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=float(0.5) * np.ones(n_actions))
+
+    start = time.time()
+    model = DDPG('MlpPolicy', env_train, param_noise=param_noise, action_noise=action_noise)
+    model.learn(total_timesteps=timesteps)
+    end = time.time()
+
+    model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
+    print('Training time (DDPG): ', (end-start)/60,' minutes')
+    return model
 
 def train_PPO(env_train, model_name, timesteps=50000):
     """PPO model"""
@@ -197,7 +213,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         print("PPO Sharpe Ratio: ", sharpe_ppo)
 
         print("======DDPG Training========")
-        model_ddpg = train_DDPG(env_train, model_name="DDPG_10k_dow_{}".format(i), timesteps=10000)
+        model_ddpg = train_DDPG(env_train, model_name="DDPG_10k_dow_{}".format(i), timesteps=20000)
         print("======DDPG Validation from: ", unique_trade_date[i - rebalance_window - validation_window], "to ",
               unique_trade_date[i - rebalance_window])
         DRL_validation(model=model_ddpg, test_data=validation, test_env=env_val, test_obs=obs_val)
