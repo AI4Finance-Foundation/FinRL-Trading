@@ -52,7 +52,8 @@ def train_TD3(env_train, model_name, timesteps=50000):
 
 def train_DDPG(env_train, model_name, timesteps=10000):
     """DDPG model"""
-    # the noise objects for DDPG
+
+    # add the noise objects for DDPG
     n_actions = env_train.action_space.shape[-1]
     param_noise = None
     action_noise = OrnsteinUhlenbeckActionNoise(mean=np.zeros(n_actions), sigma=float(0.5) * np.ones(n_actions))
