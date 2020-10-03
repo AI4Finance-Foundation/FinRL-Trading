@@ -71,7 +71,7 @@ pip install -r requirements.txt
 If you have questions regarding TensorFlow, note that tensorflow 2.0 is not compatible now, you may use
 
 ```bash
-pip install tensorflow==1.15.2
+pip install tensorflow==1.15.4
  ```
 
 If you have questions regarding Stable-baselines package, please refer to [Stable-baselines installation guide](https://github.com/hill-a/stable-baselines). Install the Stable Baselines package using pip:
