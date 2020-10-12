@@ -35,21 +35,6 @@ def train_A2C(env_train, model_name, timesteps=50000):
     print('Training time (A2C): ', (end - start) / 60, ' minutes')
     return model
 
-
-def train_TD3(env_train, model_name, timesteps=50000):
-    """TD3 model"""
-
-    start = time.time()
-    #model = DDPG('MlpPolicy', env_train)
-    model = TD3('MlpPolicy', env_train)
-    model.learn(total_timesteps=timesteps, log_interval=10)
-    end = time.time()
-
-    model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
-    print('Training time (DDPG): ', (end - start) / 60, ' minutes')
-    return model
-
-
 def train_DDPG(env_train, model_name, timesteps=10000):
     """DDPG model"""
 
@@ -71,7 +56,9 @@ def train_PPO(env_train, model_name, timesteps=50000):
     """PPO model"""
 
     start = time.time()
-    model = PPO2('MlpPolicy', env_train)
+    model = PPO2('MlpPolicy', env_train, ent_coef = 0.005, nminibatches = 8)
+    #model = PPO2('MlpPolicy', env_train, ent_coef = 0.005)
+
     model.learn(total_timesteps=timesteps)
     end = time.time()
 
@@ -175,7 +162,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         else:
             # if the mean of the historical data is less than the 90% quantile of insample turbulence data
             # then we tune up the turbulence_threshold, meaning we lower the risk 
-            turbulence_threshold = np.quantile(insample_turbulence.turbulence.values, 0.99)
+            turbulence_threshold = np.quantile(insample_turbulence.turbulence.values, 1)
         print("turbulence_threshold: ", turbulence_threshold)
 
         ############## Environment Setup starts ##############
@@ -198,7 +185,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         # print("training: ",len(data_split(df, start=20090000, end=test.datadate.unique()[i-rebalance_window]) ))
         # print("==============Model Training===========")
         print("======A2C Training========")
-        model_a2c = train_A2C(env_train, model_name="A2C_10k_dow_{}".format(i), timesteps=10000)
+        model_a2c = train_A2C(env_train, model_name="A2C_30k_dow_{}".format(i), timesteps=30000)
         print("======A2C Validation from: ", unique_trade_date[i - rebalance_window - validation_window], "to ",
               unique_trade_date[i - rebalance_window])
         DRL_validation(model=model_a2c, test_data=validation, test_env=env_val, test_obs=obs_val)
@@ -206,7 +193,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         print("A2C Sharpe Ratio: ", sharpe_a2c)
 
         print("======PPO Training========")
-        model_ppo = train_PPO(env_train, model_name="PPO_100k_dow_{}".format(i), timesteps=50000)
+        model_ppo = train_PPO(env_train, model_name="PPO_100k_dow_{}".format(i), timesteps=100000)
         print("======PPO Validation from: ", unique_trade_date[i - rebalance_window - validation_window], "to ",
               unique_trade_date[i - rebalance_window])
         DRL_validation(model=model_ppo, test_data=validation, test_env=env_val, test_obs=obs_val)
@@ -214,7 +201,8 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         print("PPO Sharpe Ratio: ", sharpe_ppo)
 
         print("======DDPG Training========")
-        model_ddpg = train_DDPG(env_train, model_name="DDPG_10k_dow_{}".format(i), timesteps=20000)
+        model_ddpg = train_DDPG(env_train, model_name="DDPG_10k_dow_{}".format(i), timesteps=10000)
+        #model_ddpg = train_TD3(env_train, model_name="DDPG_10k_dow_{}".format(i), timesteps=20000)
         print("======DDPG Validation from: ", unique_trade_date[i - rebalance_window - validation_window], "to ",
               unique_trade_date[i - rebalance_window])
         DRL_validation(model=model_ddpg, test_data=validation, test_env=env_val, test_obs=obs_val)
@@ -239,7 +227,6 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         ############## Trading starts ##############    
         print("======Trading from: ", unique_trade_date[i - rebalance_window], "to ", unique_trade_date[i])
         #print("Used Model: ", model_ensemble)
-
         last_state_ensemble = DRL_prediction(df=df, model=model_ensemble, name="ensemble",
                                              last_state=last_state_ensemble, iter_num=i,
                                              unique_trade_date=unique_trade_date,
