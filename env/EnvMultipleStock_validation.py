@@ -20,7 +20,7 @@ TRANSACTION_FEE_PERCENT = 0.001
 
 # turbulence index: 90-150 reasonable threshold
 #TURBULENCE_THRESHOLD = 140
-
+REWARD_SCALING = 1e-4
 
 class StockEnvValidation(gym.Env):
     """A stock trading environment for OpenAI gym"""
@@ -184,14 +184,14 @@ class StockEnvValidation(gym.Env):
             
             end_total_asset = self.state[0]+ \
             sum(np.array(self.state[1:(STOCK_DIM+1)])*np.array(self.state[(STOCK_DIM+1):(STOCK_DIM*2+1)]))
-            
+            self.asset_memory.append(end_total_asset)
             #print("end_total_asset:{}".format(end_total_asset))
             
             self.reward = end_total_asset - begin_total_asset            
             # print("step_reward:{}".format(self.reward))
             self.rewards_memory.append(self.reward)
-            self.asset_memory.append(end_total_asset)
-
+            
+            self.reward = self.reward*REWARD_SCALING
 
         return self.state, self.reward, self.terminal, {}
 
