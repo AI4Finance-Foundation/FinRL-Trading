@@ -24,7 +24,7 @@ For [OpenAI Baselines](https://github.com/openai/baselines), you'll need system 
 #### Ubuntu
 
 ```bash
-sudo apt-get update && sudo apt-get install cmake libopenmpi-dev python3-dev zlib1g-dev
+sudo apt-get update && sudo apt-get install cmake libopenmpi-dev python3-dev zlib1g-dev libgl1-mesa-glx
 ```
 
 #### Mac OS X
