@@ -69,8 +69,8 @@ pip install -r requirements.txt
 
 ### Questions
 
-### About Tensorflow 2.0:
-https://github.com/hill-a/stable-baselines/issues/366
+### About Tensorflow 2.0: https://github.com/hill-a/stable-baselines/issues/366
+
 If you have questions regarding TensorFlow, note that tensorflow 2.0 is not compatible now, you may use
 
 ```bash
