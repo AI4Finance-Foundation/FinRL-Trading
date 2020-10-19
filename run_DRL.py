@@ -25,7 +25,7 @@ def run_model() -> None:
     unique_trade_date = data[(data.datadate > 20151001)&(data.datadate <= 20200707)].datadate.unique()
 
     # rebalance_window is the number of months to retrain the model
-    # validation_window is the numebr of months to validation the model and select for trading
+    # validation_window is the number of months to validation the model and select for trading
     rebalance_window = 63
     validation_window = 63
     
