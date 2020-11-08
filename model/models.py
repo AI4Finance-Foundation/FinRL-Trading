@@ -5,13 +5,15 @@ import time
 import gym
 
 # RL models from stable-baselines
-from stable_baselines import SAC
+from stable_baselines import GAIL, SAC
+from stable_baselines import ACER
 from stable_baselines import PPO2
 from stable_baselines import A2C
 from stable_baselines import DDPG
 from stable_baselines import TD3
+from stable_baselines.gail import ExportDataset, generate_expert_traj
 from stable_baselines.ddpg.policies import DDPGPolicy
-from stable_baselines.common.policies import MlpPolicy
+from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy, MlpLnLstmPolicy
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
 from stable_baselines.common.vec_env import DummyVecEnv
 from preprocessing.preprocessors import *
@@ -23,7 +25,7 @@ from env.EnvMultipleStock_validation import StockEnvValidation
 from env.EnvMultipleStock_trade import StockEnvTrade
 
 
-def train_A2C(env_train, model_name, timesteps=50000):
+def train_A2C(env_train, model_name, timesteps=25000):
     """A2C model"""
 
     start = time.time()
@@ -34,6 +36,17 @@ def train_A2C(env_train, model_name, timesteps=50000):
     model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
     print('Training time (A2C): ', (end - start) / 60, ' minutes')
     return model
+
+def train_ACER(env_train, model_name, timesteps=25000):
+    start = time.time()
+    model = ACER('MlpPolicy', env_train, verbose=0)
+    model.learn(total_timesteps=timesteps)
+    end = time.time()
+
+    model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
+    print('Training time (A2C): ', (end - start) / 60, ' minutes')
+    return model
+
 
 def train_DDPG(env_train, model_name, timesteps=10000):
     """DDPG model"""
@@ -66,6 +79,26 @@ def train_PPO(env_train, model_name, timesteps=50000):
     print('Training time (PPO): ', (end - start) / 60, ' minutes')
     return model
 
+def train_GAIL(env_train, model_name, timesteps=1000):
+    """GAIL Model"""
+    start = time.time()
+    # generate expert trajectories
+    model = SAC('MLpPolicy', env_train, verbose=1)
+    generate_expert_traj(model, 'expert_model_gail', n_timesteps=100, n_episodes=10)
+
+    # Load dataset
+    dataset = ExpertDataset(expert_path='expert_model_gail.npz', traj_limitation=10, verbose=1)
+    model = GAIL('MLpPolicy', env_train, dataset, verbose=1)
+
+    model.learn(total_timesteps=1000)
+    end = time.time()
+
+    model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
+    print('Training time (PPO): ', (end - start) / 60, ' minutes')
+    return model
+
+def train_
+
 
 def DRL_prediction(df,
                    model,
@@ -76,7 +109,7 @@ def DRL_prediction(df,
                    rebalance_window,
                    turbulence_threshold,
                    initial):
-    ### make a prediction based on trained model### 
+    ### make a prediction based on trained model###
 
     ## trading env
     trade_data = data_split(df, start=unique_trade_date[iter_num - rebalance_window], end=unique_trade_date[iter_num])
@@ -158,17 +191,17 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
 
         historical_turbulence = historical_turbulence.drop_duplicates(subset=['datadate'])
 
-        historical_turbulence_mean = np.mean(historical_turbulence.turbulence.values)   
+        historical_turbulence_mean = np.mean(historical_turbulence.turbulence.values)
 
         if historical_turbulence_mean > insample_turbulence_threshold:
             # if the mean of the historical data is greater than the 90% quantile of insample turbulence data
-            # then we assume that the current market is volatile, 
-            # therefore we set the 90% quantile of insample turbulence data as the turbulence threshold 
+            # then we assume that the current market is volatile,
+            # therefore we set the 90% quantile of insample turbulence data as the turbulence threshold
             # meaning the current turbulence can't exceed the 90% quantile of insample turbulence data
             turbulence_threshold = insample_turbulence_threshold
         else:
             # if the mean of the historical data is less than the 90% quantile of insample turbulence data
-            # then we tune up the turbulence_threshold, meaning we lower the risk 
+            # then we tune up the turbulence_threshold, meaning we lower the risk
             turbulence_threshold = np.quantile(insample_turbulence.turbulence.values, 1)
         print("turbulence_threshold: ", turbulence_threshold)
 
@@ -229,9 +262,9 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
         else:
             model_ensemble = model_ddpg
             model_use.append('DDPG')
-        ############## Training and Validation ends ##############    
+        ############## Training and Validation ends ##############
 
-        ############## Trading starts ##############    
+        ############## Trading starts ##############
         print("======Trading from: ", unique_trade_date[i - rebalance_window], "to ", unique_trade_date[i])
         #print("Used Model: ", model_ensemble)
         last_state_ensemble = DRL_prediction(df=df, model=model_ensemble, name="ensemble",
@@ -241,7 +274,7 @@ def run_ensemble_strategy(df, unique_trade_date, rebalance_window, validation_wi
                                              turbulence_threshold=turbulence_threshold,
                                              initial=initial)
         # print("============Trading Done============")
-        ############## Trading ends ##############    
+        ############## Trading ends ##############
 
     end = time.time()
     print("Ensemble Strategy took: ", (end - start) / 60, " minutes")
