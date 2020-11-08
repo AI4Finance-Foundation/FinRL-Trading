@@ -3,7 +3,8 @@ import pathlib
 #import finrl
 
 import pandas as pd
-
+import datetime
+import os
 #pd.options.display.max_rows = 10
 #pd.options.display.max_columns = 10
 
@@ -18,8 +19,9 @@ import pandas as pd
 #TRAINING_DATA_FILE = "data/ETF_SPY_2009_2020.csv"
 TRAINING_DATA_FILE = "data/dow_30_2009_2020.csv"
 
-
-TRAINED_MODEL_DIR = "trained_models"
+now = datetime.datetime.now()
+TRAINED_MODEL_DIR = f"trained_models/{now}"
+os.makedirs(TRAINED_MODEL_DIR)
 TURBULENCE_DATA = "data/dow30_turbulence_index.csv"
 
 TESTING_DATA_FILE = "test.csv"
