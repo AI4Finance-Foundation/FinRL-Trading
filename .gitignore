@@ -1,6 +1,9 @@
 # Custom config
 results/
-trained_models/
+
+
+# remove DS_Store
+**/.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
