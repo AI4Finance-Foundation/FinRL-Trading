@@ -11,7 +11,7 @@ from stable_baselines import PPO2
 from stable_baselines import A2C
 from stable_baselines import DDPG
 from stable_baselines import TD3
-from stable_baselines.gail import ExportDataset, generate_expert_traj
+#from stable_baselines.gail import ExportDataset, generate_expert_traj
 from stable_baselines.ddpg.policies import DDPGPolicy
 from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy, MlpLnLstmPolicy
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
@@ -96,8 +96,6 @@ def train_GAIL(env_train, model_name, timesteps=1000):
     model.save(f"{config.TRAINED_MODEL_DIR}/{model_name}")
     print('Training time (PPO): ', (end - start) / 60, ' minutes')
     return model
-
-def train_
 
 
 def DRL_prediction(df,
