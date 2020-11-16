@@ -11,7 +11,7 @@ from stable_baselines import PPO2
 from stable_baselines import A2C
 from stable_baselines import DDPG
 from stable_baselines import TD3
-#from stable_baselines.gail import ExportDataset, generate_expert_traj
+
 from stable_baselines.ddpg.policies import DDPGPolicy
 from stable_baselines.common.policies import MlpPolicy, MlpLstmPolicy, MlpLnLstmPolicy
 from stable_baselines.common.noise import NormalActionNoise, OrnsteinUhlenbeckActionNoise, AdaptiveParamNoiseSpec
@@ -81,6 +81,7 @@ def train_PPO(env_train, model_name, timesteps=50000):
 
 def train_GAIL(env_train, model_name, timesteps=1000):
     """GAIL Model"""
+    #from stable_baselines.gail import ExportDataset, generate_expert_traj
     start = time.time()
     # generate expert trajectories
     model = SAC('MLpPolicy', env_train, verbose=1)
