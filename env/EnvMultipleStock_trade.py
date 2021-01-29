@@ -73,10 +73,9 @@ class StockEnvTrade(gym.Env):
                 self.state[0] += \
                 self.state[index+1]*min(abs(action),self.state[index+STOCK_DIM+1]) * \
                  (1- TRANSACTION_FEE_PERCENT)
-                
-                self.state[index+STOCK_DIM+1] -= min(abs(action), self.state[index+STOCK_DIM+1])
                 self.cost +=self.state[index+1]*min(abs(action),self.state[index+STOCK_DIM+1]) * \
                  TRANSACTION_FEE_PERCENT
+                self.state[index+STOCK_DIM+1] -= min(abs(action), self.state[index+STOCK_DIM+1])
                 self.trades+=1
             else:
                 pass
@@ -86,9 +85,9 @@ class StockEnvTrade(gym.Env):
                 #update balance
                 self.state[0] += self.state[index+1]*self.state[index+STOCK_DIM+1]* \
                               (1- TRANSACTION_FEE_PERCENT)
-                self.state[index+STOCK_DIM+1] =0
                 self.cost += self.state[index+1]*self.state[index+STOCK_DIM+1]* \
-                              TRANSACTION_FEE_PERCENT
+                 TRANSACTION_FEE_PERCENT
+                self.state[index+STOCK_DIM+1] =0
                 self.trades+=1
             else:
                 pass
@@ -102,11 +101,10 @@ class StockEnvTrade(gym.Env):
             #update balance
             self.state[0] -= self.state[index+1]*min(available_amount, action)* \
                               (1+ TRANSACTION_FEE_PERCENT)
-
-            self.state[index+STOCK_DIM+1] += min(available_amount, action)
-            
             self.cost+=self.state[index+1]*min(available_amount, action)* \
                               TRANSACTION_FEE_PERCENT
+            self.state[index+STOCK_DIM+1] += min(available_amount, action)
+            
             self.trades+=1
         else:
             # if turbulence goes over threshold, just stop buying
