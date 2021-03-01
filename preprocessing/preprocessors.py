@@ -133,7 +133,7 @@ def calcualte_turbulence(df):
         hist_price = df_price_pivot[[n in unique_date[0:i] for n in df_price_pivot.index ]]
         cov_temp = hist_price.cov()
         current_temp=(current_price - np.mean(hist_price,axis=0))
-        temp = current_temp.values.dot(np.linalg.inv(cov_temp)).dot(current_temp.values.T)
+        temp = current_temp.values.dot(np.linalg.pinv(cov_temp)).dot(current_temp.values.T)
         if temp>0:
             count+=1
             if count>2:
