@@ -5,6 +5,9 @@ results/
 # remove DS_Store
 **/.DS_Store
 
+# Remove vs stuff
+.vscode
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
