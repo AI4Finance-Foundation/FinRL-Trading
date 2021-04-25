@@ -1,28 +1,50 @@
 import sys
 import praw
 import time
-from datetime import datetime
-import requests
 import threading
 import json
 
 redditClient = None
 
-def fetchComments(subreddit, companies, tickers):
-    sr_obj = redditClient.subreddit(subreddit)
-    companies.extend(tickers)
-    try:
-        for comment in sr_obj.stream.comments(skip_existing=True):
+class CommentsFetcher (threading.Thread):
+    die = False
+    sr_obj = None
+    tickers = []
+    companies = []
+    def __init__(self, subreddit, companies, tickers, exit_on_fail=False):
+        threading.Thread.__init__(self)
+        self.name = 'fetch_comments_{0}'.format(subreddit)
+        self.companies = companies
+        self.tickers = tickers
+        self.exit_on_fail = exit_on_fail
+        lock = threading.RLock()
+        with lock:
+            self.sr_obj = redditClient.subreddit(subreddit)
+
+    def run(self):
+        while not self.die:
+            try:
+                self.fetchComments()
+            except Exception as e:
+                if self.exit_on_fail:
+                    raise
+                else:
+                    print("Thread {1}, Error {0} occurred while streaming comments, continuing".format(e, self.name))
+
+    def join(self):
+        self.die = True
+        super().join()
+
+    def fetchComments(self):
+        search_strings = self.companies + self.tickers
+        for comment in self.sr_obj.stream.comments(skip_existing=True, pause_after=5):
             for company in companies:
                 if company in comment.body:
-                    print(comment)
-    except Exception as error:
-        print("Error {0} occurred while streaming comments from subreddit {1}".format(error))
+                    print(comment.body)
 
 
 if __name__=='__main__':
     creds = json.loads(open("creds.json","r").read())
-    print(creds)
     redditClient = praw.Reddit(client_id=creds['client_id'],
                                client_secret=creds['client_secret'],
                                password=creds['password'],
@@ -36,7 +58,7 @@ if __name__=='__main__':
     # start fetch thread for every subreddit
     fetch_threads = []
     for sr in subreddits:
-        th = threading.Thread(name='fetch_comments_{0}'.format(sr), target=fetchComments, args=(sr, companies, tickers))
+        th = CommentsFetcher(sr, companies, tickers)
         th.start()
         fetch_threads.append(th)
 
