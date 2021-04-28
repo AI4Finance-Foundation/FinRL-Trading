@@ -40,8 +40,13 @@ class CommentsFetcher (threading.Thread):
 
     def fetchComments(self):
         for comment in self.sr_obj.stream.comments(skip_existing=True, pause_after=5):
+            comment_text = comment.body.casefold()
             for ticker in self.companies:
-                if ticker in comment.body or self.companies[ticker] in comment.body:
+                casefolded_company = self.companies[ticker].casefold()
+                if ('{0} '.format(ticker) in comment.body or
+                        ' {0}'.format(ticker) in comment.body or
+                        '{0} '.format(casefolded_company) in comment_text or
+                        ' {0}'.format(casefolded_company) in comment_text):
                     comment_obj = { "ticker": ticker, "text": comment.body, "timestamp": math.ceil(time.time_ns()/1000000) }
                     self.output(comment_obj)
                     break
