@@ -5,9 +5,6 @@ results/
 # remove DS_Store
 **/.DS_Store
 
-# Remove vs stuff
-.vscode
-
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -114,8 +111,9 @@ celerybeat.pid
 # Environments
 .env
 .venv
+env/
 venv/
-#ENV/
+ENV/
 env.bak/
 venv.bak/
 
@@ -137,3 +135,4 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+backend/twitter_keys.py
