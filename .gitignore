@@ -114,9 +114,8 @@ celerybeat.pid
 # Environments
 .env
 .venv
-env/
 venv/
-ENV/
+#ENV/
 env.bak/
 venv.bak/
 
@@ -138,5 +137,3 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# FinRL library
-src

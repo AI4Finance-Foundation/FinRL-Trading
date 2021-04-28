@@ -1,3 +1,5 @@
+import sys
+import os
 import pandas as pd
 import numpy as np
 import datetime
@@ -6,13 +8,13 @@ from finrl.marketdata.yahoodownloader import YahooDownloader
 from finrl.preprocessing.preprocessors import FeatureEngineer
 from finrl.preprocessing.data import data_split
 from finrl.env.env_stocktrading import StockTradingEnv
-from finrl.env.env_stocks import StockEnv
-from finrl.env.env_onlinestocktrading import OnlineStockTradingEnv
+
 from finrl.model.models import DRLAgent
 from finrl.trade.backtest import backtest_stats, backtest_plot, get_daily_return, get_baseline
 
-
-
+sys.path.append(os.path.join(os.path.dirname(__file__),"..","env"))
+from env_stocks import StockEnv
+from env_onlinestocktrading import OnlineStockTradingEnv
 
 class OnlineStockPrediction:
 
@@ -20,34 +22,11 @@ class OnlineStockPrediction:
         self.e_trade_gym = e_trade_gym
         self.env_trade, self.cur_obs = self.e_trade_gym.get_sb_env()
         self.model = model
-        #self.env_trade.reset()
-    
 
-    # def _get_numerical_data(self,all=True,col_list=['date','open', 'high', 'low', 'close', 'volume', 'tic','day']):
-    #     if not all:
-    #         window = 30
-    #         if len(self.e_trade_gym.df.index.unique() > window):
-    #             indices = self.e_trade_gym.df.unique()[-window:]
-    #             prev_numerical_df = self.e_trade_gym.df.loc[indices][col_list]
-    #     else:
-    #         prev_numerical_df = e_trade_gym.df[col_list]
-    #     return prev_numerical_df
-
-    # def process_data(self,numerical_df,sentiment_df):
-    #     full_numerical_df = self.compute_technical_indicators(numerical_df)
-    #     new_df = full_numerical_df.merge(sentiment_df,on=['date','tic'])
-    #     self.add_data(new_df)
-    #     return new_df
-
-    # def compute_technical_indicators(self,numerical_df):
-    #     prev_numerical_df = self._get_numerical_data(all=False)
-    #     full_df = prev_numerical_df.append(numerical_df)
-    #     full_df = self.feature_engineer.preprocess_data(full_df)
-    #     #TODO Might need to just take the indices corresponding to the new numerical data
-    #     return full_df
 
     def add_data(self,df):
         self.e_trade_gym._update_data(df)
+
 
 
     def predict(self):
@@ -117,7 +96,7 @@ def main():
     # print(trade_data.index)
     #trained_a2c = agent.train_model(model=model_a2c, tb_log_name='a2c',total_timesteps=10000)
     feature_engineer = FeatureEngineer()
-    online_stock_pred = OnlineStockPrediction(e_trade_gym,model_a2c,feature_engineer)
+    online_stock_pred = OnlineStockPrediction(e_trade_gym,model_a2c)
     for i in range(1,trade_data.index.unique().max()):
         print(trade_data.loc[i])
         online_stock_pred.add_data(trade_data.loc[i])
