@@ -1,22 +1,25 @@
-import sys
-import praw
-import time
-import threading
+import argparse
 import json
+import math
+import praw
+import threading
+import time
+
+from kafka import KafkaProducer
 
 redditClient = None
 
 class CommentsFetcher (threading.Thread):
     die = False
     sr_obj = None
-    tickers = []
-    companies = []
-    def __init__(self, subreddit, companies, tickers, exit_on_fail=False):
+    companies = {}
+    def __init__(self, subreddit, companies, exit_on_fail=False, producer=None, topic=None):
         threading.Thread.__init__(self)
         self.name = 'fetch_comments_{0}'.format(subreddit)
         self.companies = companies
-        self.tickers = tickers
         self.exit_on_fail = exit_on_fail
+        self.producer = producer
+        self.topic = topic
         lock = threading.RLock()
         with lock:
             self.sr_obj = redditClient.subreddit(subreddit)
@@ -36,14 +39,33 @@ class CommentsFetcher (threading.Thread):
         super().join()
 
     def fetchComments(self):
-        search_strings = self.companies + self.tickers
         for comment in self.sr_obj.stream.comments(skip_existing=True, pause_after=5):
-            for company in companies:
-                if company in comment.body:
-                    print(comment.body)
+            for ticker in self.companies:
+                if ticker in comment.body or self.companies[ticker] in comment.body:
+                    comment_obj = { "ticker": ticker, "text": comment.body, "timestamp": math.ceil(time.time_ns()/1000000) }
+                    self.output(comment_obj)
+                    break
 
+    def output(self, comment):
+        if self.producer is None:
+            print(comment)
+        else:
+            if self.topic is None:
+                raise ValueError("topic not supplied")
+            key = "{0}_{1}".format(comment["ticker"],comment["timestamp"])
+            try:
+                key_bytes = bytes(key, encoding='utf-8')
+                value = json.dumps(comment_obj)
+                value_bytes = bytes(value, encoding='utf-8')
+                self.producer.send(self.topic, key=key_bytes, value=value_bytes)
+            except Exception as e:
+                print("Error {0} occurred while publishing message with key {1}".format(e, key))
 
 if __name__=='__main__':
+    parser = argparse.ArgumentParser(description='Stream reddit comments to stdout or kafka topic')
+    parser.add_argument('-t', '--topic', metavar='<topic_name>', help='Kafka topic name')
+    parser.add_argument('-H', '--host', metavar='<hostname_port>', default='localhost:9092', help='Hostname:port of bootstrap server')
+    args = parser.parse_args()
     creds = json.loads(open("creds.json","r").read())
     redditClient = praw.Reddit(client_id=creds['client_id'],
                                client_secret=creds['client_secret'],
@@ -51,14 +73,18 @@ if __name__=='__main__':
                                user_agent=creds['user_agent'],
                                username=creds['username'])
 
+
     subreddits = [sr.strip() for sr in open("subreddits","r").read().split(',')]
-    companies = [cmp.strip() for cmp in open("companies","r").read().split(',')]
-    tickers = [tick.strip() for tick in open("tickers","r").read().split(',')]
+    companies = json.loads(open("companies.json","r").read())
+
+    producer = None
+    if args.topic is not None:
+       producer = KafkaProducer(bootstrap_servers=[args.host], api_version=(0, 10))
 
     # start fetch thread for every subreddit
     fetch_threads = []
     for sr in subreddits:
-        th = CommentsFetcher(sr, companies, tickers)
+        th = CommentsFetcher(sr, companies, producer, args.topic)
         th.start()
         fetch_threads.append(th)
 
