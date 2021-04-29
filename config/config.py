@@ -18,7 +18,8 @@ import os
 # data
 #TRAINING_DATA_FILE = "data/ETF_SPY_2009_2020.csv"
 TRAINING_DATA_FILE = "data/dow_30_2009_2020.csv"
-
+# List of stock tickers
+stock_tickers=['MMM','AXP','AMGN','AAPL','BA','CAT','CVX','CSCO','KO','DIS','DOW','GS','HD','HON','IBM','INTC','JNJ','JPM','MCD','MRK','MSFT','NKE','PG','CRM','TRV','UNH','VZ','V','WBA','WMT']
 now = datetime.datetime.now()
 TRAINED_MODEL_DIR = f"trained_models/{now}"
 os.makedirs(TRAINED_MODEL_DIR)
