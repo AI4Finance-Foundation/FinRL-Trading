@@ -2,6 +2,8 @@
 
 ## Step 1: get all historical S&P 500 components 
 * Get [Historical Lists of S&P 500 components since 1996](https://github.com/fja05680/sp500) 
+* Input: S&P 500 Historical Components & Changes(MM-DD-YYYY).csv
+* Output: sp500_tickers.txt
 * Preprocess and get all unique tickers, save it into a txt file for WRDS
 
 
