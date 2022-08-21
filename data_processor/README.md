@@ -9,8 +9,12 @@
 ## Step 2: get fundamental data from WRDS
 * Go to WRDS-Fundamentals Quarterly, start from 1996/01 to the most current date and do the query
 * Input: sp500_tickers.txt
-* output: raw csv file contains all fundamental data for the tickers in sp500_tickers
+* output: raw csv file contains all fundamental data for the tickers in sp500_tickers, about 200MB
 
+## Step 3: get daily price from WRDS
+* Go to WRDS-Security Daily, start from 1996/01/01 to the most current date and do the query
+* Input: sp500_tickers.txt
+* output: raw csv file contains all daily price for the tickers in sp500_tickers, about 1GB
 
 
 
