@@ -7,7 +7,7 @@ gym==0.15.3
 stable-baselines[mpi]
 tensorflow==1.15.4
 
-joblib==0.15.1
+joblib==1.2.0
 
 # plot
 matplotlib==3.2.1
