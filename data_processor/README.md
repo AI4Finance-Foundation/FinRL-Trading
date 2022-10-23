@@ -31,7 +31,7 @@ three quarters).
 * Profitability ratios: PE (Price–to-Earnings Ratio), PS (Price-to-Sales Ratio), PB (Price-to-Book Ratio), OPM (Operating Margin), NPM (Net Profit Margin), ROA (Return On Assets), ROE (Return on Equity), EPS (Earnings Per Share), BPS (Book Per Share), DPS (Dividend Per Share)
 * Liquidity ratios: Current ratio, Quick ratio, Cash ratio
 * Efficiency ratios: Inventory turnover ratio, Receivables turnover ratio, Payable turnover ratio, 
-* Leverage financial ratios: Debt ratio, Debt to Equity ratio
+* Leverage ratios: Debt ratio, Debt to Equity ratio
 
 ## 1.4 Split the financial ratios by sector
 * In order to build a sector-neutral portfolio, we split the dataset by the Global Industry Classification Standard (GICS) sectors (total 11 sectors). 
