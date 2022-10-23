@@ -23,13 +23,15 @@
 three quarters).
 ## 1.2 Get next quarter's return
 * Our goal is to predict S&P 500 forward quarter log-return; At a given time T of the financial horizon, the 1-quarter forward log-returns of a certain stock price S are defined as:
-
-
+<div align="center">
 <img align="center" width="390" alt="image" src="https://user-images.githubusercontent.com/31713746/197394617-a99436da-d20a-42c2-a63b-6af9d1a999de.png">
-
-## 1.3 Get next quarter's return
-## 1.4 Calculate Financial Ratios
-## 1.5 Split the financial ratios by sector
+</div>
+## 1.3 Calculate Financial Ratios
+* Profitability ratios: PE (Price–to-Earnings Ratio), PS (Price-to-Sales Ratio), PB (Price-to-Book Ratio), OPM (Operating Margin), NPM (Net Profit Margin), ROA (Return On Assets), ROE (Return on Equity), EPS (Earnings Per Share), BPS (Book Per Share), DPS (Dividend Per Share)
+* Liquidity ratios: Current ratio, Quick ratio, Cash ratio
+* Efficiency ratios: Inventory turnover ratio, Receivables turnover ratio, Payable turnover ratio, 
+* Leverage financial ratios: Debt ratio, Debt to Equity ratio
+## 1.4 Split the financial ratios by sector
 
 
 
