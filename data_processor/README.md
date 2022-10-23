@@ -34,8 +34,8 @@ three quarters).
 * Leverage financial ratios: Debt ratio, Debt to Equity ratio
 
 ## 1.4 Split the financial ratios by sector
-* In order to build a sector-neutral portfolio, we split the dataset by the Global Industry Classification
-Standard (GICS) sectors (total 11 sectors). 
+* In order to build a sector-neutral portfolio, we split the dataset by the Global Industry Classification Standard (GICS) sectors (total 11 sectors). 
+* 10-Energy, 15-Materials, 20-Industrials, 25-Consumer Discretionary, 30-Consumer Staples, 35-Health Care, 40-Financials, 45-Information Technology, 50-Communication Services, 55-Utilities, 60-Real Estate
 * We handle missing data separately by sector: if one factor has more than 5% missing data, we delete this factor; if a certain stock generates the most missing data, we delete this stock.
 
 
