@@ -27,14 +27,16 @@ three quarters).
 <img align="center" width="390" alt="image" src="https://user-images.githubusercontent.com/31713746/197394617-a99436da-d20a-42c2-a63b-6af9d1a999de.png">
 </div>
 
-## 1.3 Calculate Financial Ratios
+## 1.3 Calculate Financial Ratios (Welcome to add more)
 * Profitability ratios: PE (Price–to-Earnings Ratio), PS (Price-to-Sales Ratio), PB (Price-to-Book Ratio), OPM (Operating Margin), NPM (Net Profit Margin), ROA (Return On Assets), ROE (Return on Equity), EPS (Earnings Per Share), BPS (Book Per Share), DPS (Dividend Per Share)
 * Liquidity ratios: Current ratio, Quick ratio, Cash ratio
 * Efficiency ratios: Inventory turnover ratio, Receivables turnover ratio, Payable turnover ratio, 
 * Leverage financial ratios: Debt ratio, Debt to Equity ratio
-* 
-## 1.4 Split the financial ratios by sector
 
+## 1.4 Split the financial ratios by sector
+* In order to build a sector-neutral portfolio, we split the dataset by the Global Industry Classification
+Standard (GICS) sectors (total 11 sectors). 
+* We handle missing data separately by sector: if one factor has more than 5% missing data, we delete this factor; if a certain stock generates the most missing data, we delete this stock.
 
 
 **Disclaimer: Nothing herein is financial advice, and NOT a recommendation to trade real money. Please use common sense and always first consult a professional before trading or investing.**
