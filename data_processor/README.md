@@ -1,6 +1,6 @@
 # FinRL Live trading
 
-#Step 1: Query data from WRDS
+# Step 1: Query data from WRDS
 ## 1.1 Get all historical S&P 500 components 
 * Get [Historical Lists of S&P 500 components since 1996](https://github.com/fja05680/sp500) 
 * Input: S&P 500 Historical Components & Changes(MM-DD-YYYY).csv
