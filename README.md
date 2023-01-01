@@ -1,7 +1,7 @@
-# FinRL Live trading
-## Title: FinRL for Live Trading
+# FinRL trading
+## Title: FinRL for Trading
 GitHub: https://github.com/AI4Finance-Foundation/FinRL
-Purpose: Based on the open-source financial reinforcement learning framework-FinRL, develop an AI stock-selection and trading strategy based on Supervised Machine Learning (Supervised ML) and Deep Reinforcement Learning (DRL) algorithms and deploy it to an online trading platform for paper trading.
+Purpose: Based on the open-source financial reinforcement learning framework-FinRL, develop an AI stock-selection and trading strategy based on Supervised Machine Learning (Supervised ML) and Deep Reinforcement Learning (DRL) algorithms and deploy it to an online trading platform for trading.
 
 ### Phase I: Data Processing and Feature Engineering
 1. Download and install FinRL, download S&P 500 Open, High, Low, Close, and Volume (OHLCV) and Fundamental Indicators (company fundamental data), and convert the data into a daily format
