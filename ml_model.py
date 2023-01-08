@@ -18,13 +18,17 @@ from sklearn.ensemble import AdaBoostRegressor
 
 from sklearn.model_selection import TimeSeriesSplit, GridSearchCV,RandomizedSearchCV
 
-from keras.models import Sequential
-from keras.layers import Dense
-from keras.layers import LSTM
-from keras.layers import Dropout
 
+
+from xgboost import XGBRegressor
+from lightgbm import LGBMRegressor
+import time
 import os
 import errno
+
+from multiprocessing import cpu_count
+
+n_cpus = cpu_count() - 1
 
 
 def prepare_rolling_train(df,features_column,label_column,date_column,unique_datetime,testing_windows,first_trade_date_index, max_rolling_window_index,current_index):
@@ -117,9 +121,12 @@ def train_random_forest(X_train, y_train):
     # scoring_method = 'neg_mean_absolute_error'
     scoring_method = 'neg_mean_squared_error'
     #scoring_method = 'neg_mean_squared_log_error'
-
+    n_models = 1
+    for key, val in random_grid.items():
+        n_models *= len(val)
+    n_jobs_per_model = min(max(1, n_cpus//n_models), n_cpus)
     # my_cv_rf = TimeSeriesSplit(n_splits=5).split(X_train_rf)
-    rf = RandomForestRegressor(random_state=42)
+    rf = RandomForestRegressor(random_state=42, n_jobs= n_jobs_per_model)
     #RandomizedSearchCV
     #randomforest_regressor = RandomizedSearchCV(estimator=rf, 
     #                                            param_distributions=random_grid,
@@ -132,7 +139,7 @@ def train_random_forest(X_train, y_train):
     randomforest_regressor = GridSearchCV(estimator=rf, 
                                           param_grid=random_grid,
                                           cv=3, 
-                                          n_jobs=-1, 
+                                          n_jobs=n_cpus // n_jobs_per_model,
                                           scoring=scoring_method, 
                                           verbose=0)  
     
@@ -171,18 +178,24 @@ def train_svm(X_train, y_train):
     return model
 
 
-def train_gbm(X_train, y_train):
-    gbm = GradientBoostingRegressor(random_state = 42)
+def train_lightgbm(X_train, y_train):
+
+    
     # model = gbm.fit(X_train, y_train)
 
     param_grid_gbm = {'learning_rate': [0.1,  0.01, 0.001], 'n_estimators': [100, 250, 500,1000]}
+    n_models = 1
+    for key, val in param_grid_gbm.items():
+        n_models *= len(val)
+    n_jobs_per_model = min(max(1, n_cpus//n_models), n_cpus)
+    lightgbm = LGBMRegressor(random_state = 42, n_jobs=n_jobs_per_model)
     # scoring_method = 'r2'
     # scoring_method = 'explained_variance'
     # scoring_method = 'neg_mean_absolute_error'
     scoring_method = 'neg_mean_squared_error'
     #scoring_method = 'neg_mean_squared_log_error'
-    gbm_regressor = GridSearchCV(estimator=gbm, param_grid=param_grid_gbm,
-                                       cv=3, n_jobs=-1, scoring=scoring_method, verbose=0)
+    gbm_regressor = GridSearchCV(estimator=lightgbm, param_grid=param_grid_gbm,
+                                       cv=3, n_jobs=n_cpus // n_jobs_per_model, scoring=scoring_method, verbose=0)
 
     gbm_regressor.fit(X_train, y_train)
     model = gbm_regressor.best_estimator_
@@ -195,7 +208,31 @@ def train_gbm(X_train, y_train):
 
 
 
+def train_xgb(X_train, y_train):
+    xgb = XGBRegressor(random_state = 42, n_jobs=10)
 
+    param_grid_gbm = {'learning_rate': [0.1,  0.01, 0.001], 'n_estimators': [100, 250, 500,1000]}
+    n_models = 1
+    for key, val in param_grid_gbm.items():
+        n_models *= len(val)
+    n_jobs_per_model = min(max(1, n_cpus//n_models), n_cpus)
+    xgb = XGBRegressor(random_state = 42, n_jobs=n_jobs_per_model)
+    # scoring_method = 'r2'
+    # scoring_method = 'explained_variance'
+    # scoring_method = 'neg_mean_absolute_error'
+    scoring_method = 'neg_mean_squared_error'
+    #scoring_method = 'neg_mean_squared_log_error'
+    xgb_regressor = GridSearchCV(estimator=xgb, param_grid=param_grid_gbm,
+                                       cv=3, n_jobs=n_cpus // n_jobs_per_model, scoring=scoring_method, verbose=0)
+
+    xgb_regressor.fit(X_train, y_train)
+    model = xgb_regressor.best_estimator_
+    '''
+    
+    gbm_regressor = GradientBoostingRegressor()
+    model = gbm_regressor.fit(X_train, y_train)
+    '''
+    return model
 def train_ada(X_train, y_train):
     ada = AdaBoostRegressor()
 
@@ -255,18 +292,17 @@ def run_4model(df,features_column, label_column,date_column,tic_column,
               max_rolling_window_index=44):
     ## initialize all the result tables
     ## need date as index and unique tic name as columns
-    df_predict_lr = pd.DataFrame(columns=unique_ticker, index=trade_date)
     df_predict_rf = pd.DataFrame(columns=unique_ticker, index=trade_date)
-    df_predict_ridge = pd.DataFrame(columns=unique_ticker, index=trade_date)
     df_predict_gbm = pd.DataFrame(columns=unique_ticker, index=trade_date)
-
+    df_predict_xgb = pd.DataFrame(columns=unique_ticker, index=trade_date)
     df_predict_best = pd.DataFrame(columns=unique_ticker, index=trade_date)
     df_best_model_name = pd.DataFrame(columns=['model_name'], index=trade_date)
     evaluation_record = {}
     # first trade date is 1995-06-01
     # fist_trade_date_index = 20
     # testing_windows = 6
-
+    import re
+    df = df.rename(columns = lambda x:re.sub('[^A-Za-z0-9_]+', '', x))
     for i in range(first_trade_date_index, len(unique_datetime)):
         try:
             # prepare training data
@@ -303,33 +339,38 @@ def run_4model(df,features_column, label_column,date_column,tic_column,
                                                              current_index=i)
 
             # Training
-            lr_model = train_linear_regression(X_train, y_train)
+         #   lr_model = train_linear_regression(X_train, y_train)
+          
+            t = time.perf_counter()
+            xgb_model = train_xgb(X_train, y_train)
+            print(f"xgb:{time.perf_counter() - t}s")
+            t = time.perf_counter()
+            gbm_model = train_lightgbm(X_train, y_train)
+            print(f"gbm:{time.perf_counter() - t}s")
+            t =time.perf_counter()
             rf_model = train_random_forest(X_train, y_train)
-            ridge_model = train_ridge(X_train, y_train)
-            gbm_model = train_gbm(X_train, y_train)
+            print(f"rf:{time.perf_counter() - t}s")
+         #   ridge_model = train_ridge(X_train, y_train)
+            
 
 
             # Validation
-            lr_eval = evaluate_model(lr_model, X_test, y_test)
             rf_eval = evaluate_model(rf_model, X_test, y_test)
-            ridge_eval = evaluate_model(ridge_model, X_test, y_test)
-            gbm_eval = evaluate_model(gbm_model, X_test, y_test)
-
+            xgb_eval = evaluate_model(xgb_model, X_test, y_test)
+            gbm_eval = evaluate_model(gbm_model, X_test ,y_test)
             # Trading
-            y_trade_lr = lr_model.predict(X_trade)
+            
             y_trade_rf = rf_model.predict(X_trade)
-            y_trade_ridge = ridge_model.predict(X_trade)
-            y_trade_gbm  = gbm_model.predict(X_trade)
-
-
+            y_trade_xgb = xgb_model.predict(X_trade)
+            y_trade_gbm = gbm_model.predict(X_trade)
             # Decide the best model
-            eval_data = [[lr_eval, y_trade_lr], 
+            eval_data = [
                          [rf_eval, y_trade_rf] ,
-                         [ridge_eval, y_trade_ridge],
+                         [xgb_eval, y_trade_xgb],
                          [gbm_eval, y_trade_gbm]
                                 ]
             eval_table = pd.DataFrame(eval_data, columns=['model_eval', 'model_predict_return'],
-                                              index=['lr', 'rf','ridge','gbm'])        
+                                              index=['rf', 'xgb', 'gbm'])        
 
 
             evaluation_record[unique_datetime[i]]=eval_table
@@ -345,11 +386,9 @@ def run_4model(df,features_column, label_column,date_column,tic_column,
             df_best_model_name.loc[unique_datetime[i]] = best_model_name
 
             # Prepare Predicted Return table
-            append_return_table(df_predict_lr, unique_datetime, y_trade_lr, trade_tic, current_index=i)
             append_return_table(df_predict_rf, unique_datetime, y_trade_rf, trade_tic, current_index=i)
-            append_return_table(df_predict_ridge, unique_datetime, y_trade_ridge, trade_tic, current_index=i)
+            append_return_table(df_predict_xgb, unique_datetime, y_trade_xgb, trade_tic, current_index=i)
             append_return_table(df_predict_gbm, unique_datetime, y_trade_gbm, trade_tic, current_index=i)
-
             append_return_table(df_predict_best, unique_datetime, y_trade_best, trade_tic, current_index=i)
 
             print('Trade Date: ', unique_datetime[i])
@@ -357,10 +396,10 @@ def run_4model(df,features_column, label_column,date_column,tic_column,
         except Exception:
             traceback.print_exc()
     df_evaluation = get_model_evaluation_table(evaluation_record,trade_date)
-    return (df_predict_lr, 
+    return (
             df_predict_rf, 
-            df_predict_ridge, 
             df_predict_gbm,
+            df_predict_xgb,
             df_predict_best,
             df_best_model_name, 
             evaluation_record,
@@ -374,20 +413,19 @@ def get_model_evaluation_table(evaluation_record,trade_date):
             evaluation_list.append(evaluation_record[d]['model_eval'].values)
         except:
             print('error')
-    df_evaluation = pd.DataFrame(evaluation_list,columns = ['linear_regression', 'random_forest','ridge','gbm'])
+    df_evaluation = pd.DataFrame(evaluation_list,columns = ['rf', 'xgb', 'gbm'])
     df_evaluation.index = trade_date
     return df_evaluation
 
 def save_model_result(sector_result,sector_name):
-    df_predict_lr = sector_result[0].astype(np.float64)
-    df_predict_rf = sector_result[1].astype(np.float64)
-    df_predict_ridge = sector_result[2].astype(np.float64)
-    df_predict_gbm = sector_result[3].astype(np.float64)
-    df_predict_best = sector_result[4].astype(np.float64)
+    df_predict_rf = sector_result[0].astype(np.float64)
+    df_predict_gbm = sector_result[1].astype(np.float64)
+    df_predict_xgb = sector_result[2].astype(np.float64)
+    df_predict_best = sector_result[3].astype(np.float64)
 
-    df_best_model_name = sector_result[5]
-    df_evaluation_score = sector_result[6]
-    df_model_score = sector_result[7]
+    df_best_model_name = sector_result[4]
+    df_evaluation_score = sector_result[5]
+    df_model_score = sector_result[6]
     
 
 
@@ -400,10 +438,9 @@ def save_model_result(sector_result,sector_name):
                 raise
     
     
-    df_predict_lr.to_csv('results/'+sector_name+'/df_predict_lr.csv')
     df_predict_rf.to_csv('results/'+sector_name+'/df_predict_rf.csv')
-    df_predict_ridge.to_csv('results/'+sector_name+'/df_predict_ridge.csv')
     df_predict_gbm.to_csv('results/'+sector_name+'/df_predict_gbm.csv')
+    df_predict_xgb.to_csv('results/'+sector_name+'/df_predict_xgb.csv')
     df_predict_best.to_csv('results/'+sector_name+'/df_predict_best.csv')
     df_best_model_name.to_csv('results/'+sector_name+'/df_best_model_name.csv')
     #df_evaluation_score.to_csv('results/'+sector_name+'/df_evaluation_score.csv')
