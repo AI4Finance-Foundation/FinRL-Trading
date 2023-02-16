@@ -1,10 +1,8 @@
-# FinRL trading
+# FinRL for trading
 
 [ChatGPT for FinTech](https://github.com/AI4Finance-Foundation/ChatGPT-for-FinTech)
 
-## Title: FinRL for Trading
-
-Purpose: Based on the open-source financial reinforcement learning framework FinRL (https://github.com/AI4Finance-Foundation/FinRL), develop an AI stock-selection and trading strategy based on Supervised Machine Learning (Supervised ML) and Deep Reinforcement Learning (DRL) algorithms and deploy it to an online trading platform for trading.
+Purpose: Based on FinRL (https://github.com/AI4Finance-Foundation/FinRL), develop an AI stock-selection and trading strategy using Supervised Learning (SL) and Deep Reinforcement Learning (DRL) and deploy it to an online trading platform.
 
 ### Phase I: Data Processing and Feature Engineering
 1. Download and install FinRL, download S&P 500 Open, High, Low, Close prices, and Volume (OHLCV) and Fundamental Indicators (company fundamental data), and convert the data into a daily format
