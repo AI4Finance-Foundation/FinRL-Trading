@@ -1,7 +1,7 @@
 # Deep Reinforcement Learning for Automated Stock Trading: An Ensemble Strategy
 This repository provides codes for [ICAIF 2020 paper](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3690996)
 
-This ensemble strategy is reimplemented in a Jupiter Notebook at [FinRL](https://github.com/AI4Finance-LLC/FinRL-Library).
+This ensemble strategy is reimplemented in a Jupiter Notebook at [FinRL](https://github.com/AI4Finance-Foundation/FinRL-Library).
 
 
 ## Abstract
@@ -15,7 +15,7 @@ Hongyang Yang, Xiao-Yang Liu, Shan Zhong, and Anwar Walid. 2020. Deep Reinforcem
 ## [Our Medium Blog](https://medium.com/@ai4finance/deep-reinforcement-learning-for-automated-stock-trading-f1dad0126a02)
 ## Installation:
 ```shell
-git clone https://github.com/AI4Finance-LLC/Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020.git
+git clone https://github.com/AI4Finance-Foundation/Deep-Reinforcement-Learning-for-Automated-Stock-Trading-Ensemble-Strategy-ICAIF-2020.git
 ```
 
 
