@@ -4,7 +4,7 @@
 
 # FinRL for trading
 
-[ChatGPT for FinTech](https://github.com/AI4Finance-Foundation/ChatGPT-for-FinTech)
+![Visitors](https://api.visitorbadge.io/api/VisitorHit?user=AI4Finance-Foundation&repo=FinRL-Trading&countColor=%23B17A)
 
 Purpose: Based on FinRL (https://github.com/AI4Finance-Foundation/FinRL), develop an AI stock-selection and trading strategy using Supervised Learning (SL) and Deep Reinforcement Learning (DRL), and deploy it to an online trading platform.
 
