@@ -33,9 +33,17 @@ n_cpus = cpu_count() - 1
 
 import numpy as np
 import pandas as pd
-from gym.utils import seeding
-import gym
-from gym import spaces
+
+# Try to import gymnasium instead of gym for compatibility
+try:
+    import gymnasium as gym
+    from gymnasium.utils import seeding
+    from gymnasium import spaces
+except ImportError:
+    import gym
+    from gym.utils import seeding
+    from gym import spaces
+
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -43,14 +51,24 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 
 
-def prepare_rolling_train(df,date_column,testing_window, max_rolling_window, trade_date):
+def prepare_rolling_train(df, date_column, testing_window, max_rolling_window, trade_date):
     print(trade_date-max_rolling_window, trade_date-testing_window)
-    train = data_split(df, trade_date-max_rolling_window, trade_date-testing_window)
+    # 确保使用正确的列名 - data_split 期望 'date' 列
+    if 'datadate' in df.columns and 'date' not in df.columns:
+        df_temp = df.rename(columns={'datadate': 'date'})
+    else:
+        df_temp = df
+    train = data_split(df_temp, trade_date-max_rolling_window, trade_date-testing_window)
     #print(train)
     return train
 
-def prepare_rolling_test(df,date_column,testing_window, max_rolling_window, trade_date):
-    test=data_split(df, trade_date-testing_window, trade_date)
+def prepare_rolling_test(df, date_column, testing_window, max_rolling_window, trade_date):
+    # 确保使用正确的列名 - data_split 期望 'date' 列
+    if 'datadate' in df.columns and 'date' not in df.columns:
+        df_temp = df.rename(columns={'datadate': 'date'})
+    else:
+        df_temp = df
+    test=data_split(df_temp, trade_date-testing_window, trade_date)
         
     X_test=test.reset_index()
     return test
@@ -152,20 +170,34 @@ def append_return_table(df_predict, unique_datetime, y_trade_return, trade_tic, 
     tmp_table = tmp_table.append(pd.Series(y_trade_return, index=trade_tic), ignore_index=True)
     df_predict.loc[unique_datetime[current_index]][tmp_table.columns] = tmp_table.loc[0]
 
-
+# remove td3 and sac model
 def run_models(df,date_column, trade_date, env_kwargs, 
               testing_window=4,
               max_rolling_window=44):
+    print(f"=== run_models DEBUG ===")
+    print(f"Input df columns: {list(df.columns)}")
+    print(f"Input date_column parameter: {date_column}")
+    print(f"Input df has 'date' column: {'date' in df.columns}")
+    print(f"Input df has 'datadate' column: {'datadate' in df.columns}")
+    
     ## initialize all the result tables
     ## need date as index and unique tic name as columns
     evaluation_record = {}
     # first trade date is 1995-06-01
     # fist_trade_date_index = 20
     # testing_windows = 6
-    X_train = prepare_rolling_train(df, date_column, testing_window, max_rolling_window, trade_date)
+    
+    # make sure right DataFrame
+    df_ = df.copy()
+    print(f"After copy - df_ columns: {list(df_.columns)}")
+    
+    X_train = prepare_rolling_train(df_, date_column, testing_window, max_rolling_window, trade_date)
+    print(f"After prepare_rolling_train - X_train shape: {X_train.shape if hasattr(X_train, 'shape') else 'No shape'}")
 
-            # prepare testing data
-    X_test = prepare_rolling_test(df, date_column, testing_window, max_rolling_window, trade_date)
+    # prepare testing data
+    X_test = prepare_rolling_test(df_, date_column, testing_window, max_rolling_window, trade_date)
+    print(f"After prepare_rolling_test - X_test shape: {X_test.shape if hasattr(X_test, 'shape') else 'No shape'}")
+    
     e_train_gym = StockPortfolioEnv(df = X_train, **env_kwargs)
     env_train, _ = e_train_gym.get_sb_env()
     agent = DRLAgent(env = env_train)
@@ -173,8 +205,8 @@ def run_models(df,date_column, trade_date, env_kwargs,
     a2c_model = train_a2c(agent)
     ppo_model = train_ppo(agent)
     ddpg_model = train_ddpg(agent)
-    td3_model = train_td3(agent)
-    sac_model = train_sac(agent)
+    #td3_model = train_td3(agent)
+    #sac_model = train_sac(agent)
     
     best_model = None
     max_return = -np.inf
@@ -207,20 +239,20 @@ def run_models(df,date_column, trade_date, env_kwargs,
     df_daily_return, df_actions = DRLAgent.DRL_prediction(
     model=ppo_model, environment=e_trade_gym
 )
-    td3_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
-    if td3_return > max_return:
-        max_return = td3_return
-        best_model = td3_model
+    #td3_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
+    #if td3_return > max_return:
+    #    max_return = td3_return
+    #    best_model = td3_model
     
-    df_daily_return, df_actions = DRLAgent.DRL_prediction(
-    model=sac_model, environment=e_trade_gym
-)
-    sac_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
-    if sac_return > max_return:
-        max_return = sac_return
-        best_model = sac_model
+   # df_daily_return, df_actions = DRLAgent.DRL_prediction(
+   # model=sac_model, environment=e_trade_gym
+#)
+    #sac_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
+   # if sac_return > max_return:
+   #     max_return = sac_return
+    #    best_model = sac_model
     
-    return a2c_model,ppo_model,ddpg_model,td3_model,sac_model,best_model
+    return a2c_model,ppo_model,ddpg_model,best_model
 def get_model_evaluation_table(evaluation_record,trade_date):
     evaluation_list = []
     for d in trade_date:
