@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import traceback
 
+import torch
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+USE_GPU = (DEVICE == "cuda")
+
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.svm import SVR
@@ -33,6 +37,55 @@ n_cpus = cpu_count() - 1
 
 import numpy as np
 import pandas as pd
+# ==== ADD：Each trade_date × 1 checkpoint per model (saved at the end) ====
+import os
+
+from stable_baselines3 import A2C, PPO, DDPG
+ALGOS = {"a2c": A2C, "ppo": PPO, "ddpg": DDPG}
+
+import shutil
+import os
+
+def save_ckpt(model, save_dir, algo_name: str, keep_last_n_dirs: int = 3):
+    os.makedirs(save_dir, exist_ok=True)
+    path = os.path.join(save_dir, f"{algo_name}_final.zip")
+    model.save(path)
+    if hasattr(model, "save_replay_buffer"):
+        try:
+            model.save_replay_buffer(path.replace(".zip", "_replay.pkl"))
+        except Exception:
+            pass
+
+    # === save N date directories ===
+    parent_dir = os.path.dirname(save_dir)
+    # only take directories
+    dirs = [d for d in os.listdir(parent_dir) if os.path.isdir(os.path.join(parent_dir, d))]
+    # sort by date string (assume format is YYYY-MM-DD)
+    dirs_sorted = sorted(dirs)
+    if len(dirs_sorted) > keep_last_n_dirs:
+        old_dirs = dirs_sorted[:-keep_last_n_dirs]
+        for d in old_dirs:
+            old_path = os.path.join(parent_dir, d)
+            try:
+                shutil.rmtree(old_path)
+                print(f"[INFO] Removed old checkpoint directory: {old_path}")
+            except Exception as e:
+                print(f"[WARN] Failed to remove {old_path}: {e}")
+
+    return path
+
+def load_ckpt(env, save_dir, algo_name: str, device="auto"):
+    path = os.path.join(save_dir, f"{algo_name}_final.zip")
+    if not os.path.exists(path):
+        return None
+    model = ALGOS[algo_name].load(path, env=env, device=device, print_system_info=False)
+    rb_path = path.replace(".zip", "_replay.pkl")
+    if hasattr(model, "load_replay_buffer") and os.path.exists(rb_path):
+        try:
+            model.load_replay_buffer(rb_path)
+        except Exception:
+            pass
+    return model
 
 # Try to import gymnasium instead of gym for compatibility
 try:
@@ -53,7 +106,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 
 def prepare_rolling_train(df, date_column, testing_window, max_rolling_window, trade_date):
     print(trade_date-max_rolling_window, trade_date-testing_window)
-    # 确保使用正确的列名 - data_split 期望 'date' 列
+    # ensure using correct column name - data_split expects 'date' column
     if 'datadate' in df.columns and 'date' not in df.columns:
         df_temp = df.rename(columns={'datadate': 'date'})
     else:
@@ -81,9 +134,13 @@ def prepare_trade_data(df,features_column,label_column,date_column,tic_column,un
     return X_trade,y_trade,trade_tic
 
 
-def train_a2c(agent):
-
-    A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
+def train_a2c(agent,USE_GPU ):
+    #add GPU support 
+    #A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
+    if USE_GPU:
+        A2C_PARAMS = {"n_steps": 128, "ent_coef": 0.005, "learning_rate": 0.0002, "device": DEVICE}
+    else:
+        A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
     model_a2c = agent.get_model(model_name="a2c",model_kwargs = A2C_PARAMS)
     trained_a2c = agent.train_model(model=model_a2c, 
                                 tb_log_name='a2c',
@@ -91,12 +148,21 @@ def train_a2c(agent):
     
     return trained_a2c
 
-def train_ppo(agent):
-    PPO_PARAMS = {
-    "n_steps": 2048,
-    "ent_coef": 0.005,
-    "learning_rate": 0.0001,
-    "batch_size": 128,
+def train_ppo(agent,USE_GPU ):
+    if USE_GPU:
+        PPO_PARAMS = {
+        "n_steps": 2048,
+        "ent_coef": 0.005,
+        "learning_rate": 0.0001,
+        "batch_size": 1024,
+        "device": DEVICE}
+    else:
+
+        PPO_PARAMS = {
+        "n_steps": 2048,
+        "ent_coef": 0.005,
+        "learning_rate": 0.0001,
+        "batch_size": 128,
     }
     model_ppo = agent.get_model("ppo",model_kwargs = PPO_PARAMS)
     trained_ppo = agent.train_model(model=model_ppo, 
@@ -105,8 +171,12 @@ def train_ppo(agent):
 
     return trained_ppo
 
-def train_ddpg(agent):
-    DDPG_PARAMS = {"batch_size": 128, "buffer_size": 50000, "learning_rate": 0.001}
+def train_ddpg(agent,USE_GPU ):
+    if USE_GPU:
+        DDPG_PARAMS = {"batch_size": 1024, "buffer_size": 100000, "learning_rate": 0.001, "device": DEVICE}
+    else:
+        DDPG_PARAMS = {"batch_size": 128, "buffer_size": 50000, "learning_rate": 0.001}
+
     model_ddpg = agent.get_model("ddpg",model_kwargs = DDPG_PARAMS) 
 
     trained_ddpg = agent.train_model(model=model_ddpg, 
@@ -200,14 +270,46 @@ def run_models(df,date_column, trade_date, env_kwargs,
     
     e_train_gym = StockPortfolioEnv(df = X_train, **env_kwargs)
     env_train, _ = e_train_gym.get_sb_env()
+    # ==== Original logic ====
+    """
     agent = DRLAgent(env = env_train)
 
-    a2c_model = train_a2c(agent)
-    ppo_model = train_ppo(agent)
-    ddpg_model = train_ddpg(agent)
+    a2c_model = train_a2c(agent,USE_GPU )
+    ppo_model = train_ppo(agent,USE_GPU )
+    ddpg_model = train_ddpg(agent,USE_GPU )
     #td3_model = train_td3(agent)
     #sac_model = train_sac(agent)
-    
+    """
+    # ==== ADD: Each trade_date × 1 checkpoint per model (saved at the end) ====
+    agent = DRLAgent(env=env_train)
+    ckpt_base = os.path.join("./checkpoints", str(trade_date.date()))
+
+    # === A2C ===
+    a2c_model = load_ckpt(env_train, ckpt_base, "a2c", device=DEVICE)
+    if a2c_model is None:
+        A2C_PARAMS = {"n_steps": 1024 if USE_GPU else 5, "ent_coef": 0.005, "learning_rate": 0.0002, "device": DEVICE}
+        a2c_model = agent.get_model("a2c", model_kwargs=A2C_PARAMS)
+    a2c_model.learn(total_timesteps=50000, progress_bar=False)
+    save_ckpt(a2c_model, ckpt_base, "a2c")
+
+    # === PPO ===
+    ppo_model = load_ckpt(env_train, ckpt_base, "ppo", device=DEVICE)
+    if ppo_model is None:
+        PPO_PARAMS = {"n_steps": 2048, "ent_coef": 0.005, "learning_rate": 0.0001,
+                    "batch_size": (2048 if USE_GPU else 128), "device": DEVICE}
+        ppo_model = agent.get_model("ppo", model_kwargs=PPO_PARAMS)
+    ppo_model.learn(total_timesteps=80000, progress_bar=False)
+    save_ckpt(ppo_model, ckpt_base, "ppo")
+
+    # === DDPG（off-policy） ===
+    ddpg_model = load_ckpt(env_train, ckpt_base, "ddpg", device=DEVICE)
+    if ddpg_model is None:
+        DDPG_PARAMS = {"batch_size": (2048 if USE_GPU else 128), "buffer_size": 100000,
+                    "learning_rate": 0.001, "device": DEVICE}
+        ddpg_model = agent.get_model("ddpg", model_kwargs=DDPG_PARAMS)
+    ddpg_model.learn(total_timesteps=50000, progress_bar=False)
+    save_ckpt(ddpg_model, ckpt_base, "ddpg")
+
     best_model = None
     max_return = -np.inf
     e_trade_gym = StockPortfolioEnv(df = X_test, **env_kwargs)
@@ -236,9 +338,9 @@ def run_models(df,date_column, trade_date, env_kwargs,
         max_return = ddpg_return
         best_model = ddpg_model
 
-    df_daily_return, df_actions = DRLAgent.DRL_prediction(
-    model=ppo_model, environment=e_trade_gym
-)
+   # df_daily_return, df_actions = DRLAgent.DRL_prediction(
+#    model=ppo_model, environment=e_trade_gym
+#)
     #td3_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
     #if td3_return > max_return:
     #    max_return = td3_return
