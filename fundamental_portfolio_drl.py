@@ -23,22 +23,20 @@ from finrl.meta.preprocessor.preprocessors import FeatureEngineer
 from finrl.meta.preprocessor.preprocessors import data_split
 from finrl import config
 import pickle
-
-from rl_model import run_models
-# ==== ADD：Temp directory ====
-CACHE_DIR = "./cache"
-CKPT_DIR  = "./checkpoints"  # For readability; training saved by rl_model.py
-RESULTS_DIR = "./results"
-os.makedirs(CACHE_DIR, exist_ok=True)
-os.makedirs(CKPT_DIR,  exist_ok=True)
-os.makedirs(RESULTS_DIR, exist_ok=True)
-
-
-# ==== ADD：Deterministic & Random Seed ====
 import random
 import torch
 
+import time
+from rl_model import run_models
+# ==== ADD：Temp directory ====
+#CACHE_DIR = "./cache"
+#CKPT_DIR  = "./checkpoints"  # For readability; training saved by rl_model.py
+RESULTS_DIR = "./results"
+#os.makedirs(CACHE_DIR, exist_ok=True)
+#os.makedirs(CKPT_DIR,  exist_ok=True)
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# ==== ADD：Deterministic & Random Seed ====
 def set_global_seed(seed: int = 42):
     random.seed(seed)
     np.random.seed(seed)
@@ -58,10 +56,10 @@ def atomic_to_csv(df: pd.DataFrame, path: str, index: bool | None = None):
     df.to_csv(tmp, index=(True if index is None else index))
     os.replace(tmp, path)
 
-def atomic_to_parquet(df: pd.DataFrame, path: str, index: bool = False):
-    tmp = path + ".tmp"
-    df.to_parquet(tmp, index=index)
-    os.replace(tmp, path)
+#def atomic_to_parquet(df: pd.DataFrame, path: str, index: bool = False):
+#    tmp = path + ".tmp"
+#    df.to_parquet(tmp, index=index)
+#    os.replace(tmp, path)
 
 
 def atomic_write_json(obj: dict, path: str):
@@ -79,14 +77,20 @@ def load_progress():
     if os.path.exists(PROGRESS_PATH):
         with open(PROGRESS_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
-    return {"last_idx": -1, "last_trade_date": None}
+    return {"last_idx": -1, "last_trade_date": None, "df_dict": None}  # add df_dict field
 
-def save_progress(idx, trade_date):
-    atomic_write_json({"last_idx": idx, "last_trade_date": str(trade_date.date())}, PROGRESS_PATH)
+def save_progress(idx, trade_date, df_dict):  # add df_dict parameter
+    atomic_write_json({
+        "last_idx": idx, 
+        "last_trade_date": str(trade_date.date()),
+        "df_dict": df_dict  # save df_dict state
+    }, PROGRESS_PATH)
     print(f"Saved progress to {PROGRESS_PATH}")
 
 
-# ==== ADD：FeatureEngineer Cache Tool ====
+"""
+
+
 import hashlib
 
 def _hash_list(values) -> str:
@@ -97,10 +101,10 @@ def load_or_build_fe_features(df_src: pd.DataFrame,
                               p1_stock: pd.Series,
                               earliest_date: pd.Timestamp,
                               end_exclusive: pd.Timestamp) -> pd.DataFrame:
-    """
-    Only cache FeatureEngineer.preprocess_data() output (without cov_list/return_list).
-    key is determined by (earliest_date, end_exclusive, stock set hash).
-    """
+
+#    Only cache FeatureEngineer.preprocess_data() output (without cov_list/return_list).
+#    key is determined by (earliest_date, end_exclusive, stock set hash).
+
     key = f"{earliest_date.date()}_{end_exclusive.date()}_{_hash_list(p1_stock)}"
     feat_path = f"{CACHE_DIR}/fe_{key}.parquet"
 
@@ -127,8 +131,7 @@ def load_or_build_fe_features(df_src: pd.DataFrame,
     atomic_to_parquet(df_, feat_path, index=False)
     print(f"Cached FE features to {feat_path}")
     return df_
-
-
+"""
 def check_per_date_stock_coverage(df_, stock_dim):
     stock_counts = df_.groupby("date")["tic"].nunique()
     invalid_dates = stock_counts[stock_counts != stock_dim]
@@ -393,7 +396,10 @@ def main():
     print(f"Last filtered date: {filtered_trade_dates[-1]}")
 
 
-    df_dict = {'trade_date':[], 'gvkey':[], 'weights':[]}
+    prog = load_progress()
+    start_idx = max(1, prog.get("last_idx", -1) + 1)
+    df_dict = prog.get("df_dict", {'trade_date':[], 'gvkey':[], 'weights':[]})  # 恢复df_dict
+
     # 1 year
     #testing_window = pd.Timedelta(np.timedelta64(1,'Y'))
     testing_window = pd.Timedelta(days=365)  # 1 year --
@@ -402,8 +408,8 @@ def main():
 
     print(f"Number of trade dates used (should be ~31): {len(trade_date)}")
     # ==== ADD：Progress Tracking ====
-    prog = load_progress()
-    start_idx = max(1, prog.get("last_idx", -1) + 1)
+    #prog = load_progress()
+    #start_idx = max(1, prog.get("last_idx", -1) + 1)
 
     for idx in range(start_idx, len(trade_date)):
         current_trade_date = trade_date[idx-1]
@@ -423,38 +429,28 @@ def main():
 
         earliest_date = current_trade_date - max_rolling_window
 
-        # Original logic replaced by cache version
-        """
-        ###df_ = df[df['tic'].isin(p1_stock) & (df['date'] >= earliest_date) & (df['date'] < trade_date[idx])]
-        #print(f"Processing trade date {idx}: {current_trade_date}")
-        #print(f"Data shape: {df_.shape}")
         
-        #if df_.empty:
-        #    print(f"Warning: No data for trade date {current_trade_date}. Skipping...")
-        #    continue
-        #fe = FeatureEngineer(
-        #                use_technical_indicator=True,
-        #                use_turbulence=False,
-        #                user_defined_feature = False)
-
-        #df_ = fe.preprocess_data(df_)
-
-        #df_=df_.sort_values(['date','tic'],ignore_index=True)
-        #df_.index = df_.date.factorize()[0]
-        """     
-        # Use cache version (only cache to FE output)
-        df_ = load_or_build_fe_features(df, p1_stock, earliest_date, trade_date[idx])
+        df_ = df[df['tic'].isin(p1_stock) & (df['date'] >= earliest_date) & (df['date'] < trade_date[idx])]
         print(f"Processing trade date {idx}: {current_trade_date}")
-        print(f"Data shape after FE (from cache or freshly built): {df_.shape}")
-
+        print(f"Data shape: {df_.shape}")
+        
         if df_.empty:
             print(f"Warning: No data for trade date {current_trade_date}. Skipping...")
             continue
+        fe = FeatureEngineer(
+                        use_technical_indicator=True,
+                        use_turbulence=False,
+                        user_defined_feature = False)
 
+        df_ = fe.preprocess_data(df_)
+
+        df_=df_.sort_values(['date','tic'],ignore_index=True)
+        df_.index = df_.date.factorize()[0]
+             
         cov_list = []
         return_list = []
 
-    # look back is one year
+        # look back is one year
         lookback=252
         for i in range(lookback,len(df_.index.unique())):
             data_lookback = df_.loc[i-lookback:i,:]
@@ -564,12 +560,24 @@ def main():
             print(f"df_actions shape: {df_actions.shape if hasattr(df_actions, 'shape') else 'No shape'}")
             print(f"df_actions columns: {list(df_actions.columns) if hasattr(df_actions, 'columns') else 'No columns'}")
             
+            # weight accumulation
             for i in range(len(df_actions)):
                 for j in df_actions.columns:
                     df_dict['trade_date'].append(df_actions.index[i])
                     df_dict['gvkey'].append(j)
                     df_dict['weights'].append(df_actions.loc[df_actions.index[i], j])
-                    
+            
+            out_prefix = f"bt_{current_trade_date.strftime('%Y%m%d')}_{trade_date[idx].strftime('%Y%m%d')}"
+            summary_df = compute_and_save_performance(
+                df_daily_return=df_daily_return,
+                df_actions=df_actions,
+                out_prefix=out_prefix,
+                results_dir="results",
+                rf_annual=0.02,
+                trading_days=252
+            )
+            print(summary_df)
+            
         except Exception as e:
             print(f"Error processing trade date {current_trade_date}: {str(e)}")
             
@@ -616,24 +624,16 @@ def main():
                     print(insufficient_stocks.head(10))
         
             continue
-        save_progress(idx, trade_date[idx])
+        save_progress(idx, trade_date[idx], df_dict)  #  save df_dict
 
 
+    # save the accumulated weights data after the loop
     df_rl = pd.DataFrame(df_dict)
     df_rl.to_csv("./results/drl_weight.csv")
     print("DRL weights saved to drl_weight.csv")
 
 
-    out_prefix = f"bt_{current_trade_date.strftime('%Y%m%d')}_{trade_date[idx].strftime('%Y%m%d')}"
-    summary_df = compute_and_save_performance(
-        df_daily_return=df_daily_return,
-        df_actions=df_actions,
-        out_prefix=out_prefix,
-        results_dir="results",
-        rf_annual=0.02,
-        trading_days=252
-    )
-    print(summary_df)
+
 
     # add debug info at the end of the file
     print(f"\nDebug: df_dict contents:")
@@ -648,9 +648,9 @@ def main():
         print("2. No data available for the selected stocks")
         print("3. Errors in the DRL model training/prediction")
     else:
-        df_rl = pd.DataFrame(df_dict)
-        df_rl.to_csv("drl_weight.csv")
-        print(f"DRL weights saved to drl_weight.csv")
+        #df_rl = pd.DataFrame(df_dict)
+        #df_rl.to_csv("drl_weight.csv")
+        #print(f"DRL weights saved to drl_weight.csv")
         print(f"Final DataFrame shape: {df_rl.shape}")
 
 if __name__ == "__main__":
