@@ -31,4 +31,20 @@ Purpose: Based on FinRL (https://github.com/AI4Finance-Foundation/FinRL), develo
 • GitHub Code: https://github.com/AI4Finance-Foundation/FinRL-Meta/blob/master/tutorials/3-Practical/FinRL_PaperTrading_Demo.ipynb
 
 
+### Phase IV: Execute paper trading
+- Place real orders and write to the default log filename
+```
+python alpaca_batch_order_by_weights.py
+```
+
+- Specify a log file name
+```
+python alpaca_batch_order_by_weights.py --log-csv orders_today.csv
+```
+
+- Dry-run mode also generates a log
+```
+python alpaca_batch_order_by_weights.py --dry-run --log-csv dry_run_log.csv
+```
+
 **Disclaimer: Nothing herein is financial advice, and NOT a recommendation to trade real money. Please use common sense and always first consult a professional before trading or investing.**
