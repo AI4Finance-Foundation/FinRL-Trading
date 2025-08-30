@@ -1,0 +1,83 @@
+alp_execution:
+  max_orders: 500
+  poll_fills: 1
+alpaca:
+  api_key: PKPWCZPOOYKF0YF2G68Z
+  api_secret: aRW9f6XvlYckqHtib0vOgtkxfYDsQ5qkQUIDDbF2
+  data_endpoint: https://data.alpaca.markets/v2
+  env: paper
+  trading_endpoint: https://paper-api.alpaca.markets/v2
+execution:
+  enable_idempotency: false
+  mode_on_buy: bracket
+  mode_on_sell: market
+  out_orders: ./data/outputs/planned_orders.csv
+  out_plan: ./data/outputs/rebalance_plan.csv
+  sl_pct: 0.03
+  time_in_force: DAY
+  tp_pct: 0.05
+idempotency:
+  client_order_id_prefix: SBX
+  enable_client_order_id: true
+logging:
+  level: info
+  m1_file: ./logs/signal_bus_YYYYMMDD.log
+  m2_file: ./logs/execution_YYYYMMDD.log
+  m4_file: ./logs/m4_execution.log
+  scheduler_file: ./logs/scheduler.log
+mapping:
+  file: ./data/mapping/tic_gvkey_mapping_2025.csv
+  id_col: gvkey
+  id_column: gvkey
+  sym_col: symbol
+  symbol_column: tic
+  validate_unique: true
+pricing:
+  batch_size: 200
+  fallback: last_bar
+  fill_price: null
+  price_template: ./data/outputs/price_template.csv
+  source: alpaca_snapshot
+risk:
+  fractional_shares:
+    adjust_for_overflow: true
+    enabled: true
+    max_total_weight: 1.0
+    min_order_notional: 2.0
+    quantity_precision: 2
+  max_notional_per_order: 200000
+  max_share_per_order: 100000
+  max_total_notional: 1000000
+  min_cash_buffer_pct: 0.02
+  price_source: alpaca_snapshot
+  price_tolerance_pct: 0.05
+  reject_if_price_missing: true
+scheduler:
+  m1:
+    blend: null
+    mode: select
+    pick: drl
+  m1_manifest: ./config/strategy_manifest.yaml
+  m2:
+    config_path: ./config/config.yaml
+    debug: true
+    equity: 100181.9
+    execution_mode: online
+    fetch_real_prices: true
+    price_source: snapshot
+    save_prices: ./data/outputs/real_prices.csv
+  m4:
+    mode: real
+    pass_orders_plan: true
+    run: true
+  m5:
+    extra_args: --debug
+    out_dir: ./data/outputs
+    run: true
+    source: logs
+  time: 09:00
+weights:
+  allow_cash: false
+  allow_short: false
+  blacklist: []
+  max_weight: 0.2
