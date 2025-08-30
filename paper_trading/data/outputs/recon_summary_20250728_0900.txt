@@ -1,0 +1,11 @@
+Final Position Reconciliation Summary
+==================================================
+
+Total Symbols: 212
+Total Target Market Value: $99,241.56
+Total Actual Market Value: $99,241.56
+Total Target Weight: 0.99%
+Total Actual Weight: 100.00%
+OK Count: 212
+Mismatch Count: 0
+Success Rate: 100.0%

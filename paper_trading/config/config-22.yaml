@@ -1,0 +1,39 @@
+
+mapping:
+  file: ./data/mapping/tic_gvkey_mapping_2025.csv
+  id_column: gvkey
+  symbol_column: tic
+  validate_unique: true
+
+weights:
+  allow_short: false
+  allow_cash: false
+  max_weight: 0.20
+  blacklist: []
+
+execution:
+  mode_on_buy: bracket
+  mode_on_sell: market
+  tp_pct: 0.05
+  sl_pct: 0.03
+  time_in_force: DAY
+  enable_idempotency: false
+
+pricing:
+  source: alpaca_snapshot
+  fallback: last_bar
+  batch_size: 200
+
+scheduler:
+  time: 09:00
+  m1_manifest: ./config/strategy_manifest.yaml
+  m1:
+    mode: select
+    pick: equal
+  m2:
+    equity: 10000
+  debug_prices: 100    # 这里表示传给 M2 的 fill-price=100
+  config_path: ./config/config.yaml
+
+
+

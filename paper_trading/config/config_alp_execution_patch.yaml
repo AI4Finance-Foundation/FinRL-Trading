@@ -1,0 +1,20 @@
+# --- Add or ensure the following blocks exist ---
+alp_execution:
+  max_orders: 100
+  poll_fills: 1
+
+risk:
+  max_share_per_order: 100000
+  max_notional_per_order: 1000000
+  max_total_notional: 5000000
+  price_tolerance_pct: 0.10
+  min_cash_buffer_pct: 0.02
+  reject_if_price_missing: true
+
+idempotency:
+  enable_client_order_id: true
+  client_order_id_prefix: ORD
+
+alpaca:
+  trading_endpoint: https://paper-api.alpaca.markets
+  data_endpoint: https://data.alpaca.markets

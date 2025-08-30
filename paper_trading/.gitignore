@@ -1,0 +1,45 @@
+# --- IDE / system ---
+.idea/
+.vscode/
+*.code-workspace
+.DS_Store
+Thumbs.db
+
+# --- Python / venv / cache ---
+__pycache__/
+*.pyc
+.myenv/
+myenv/
+.env
+.venv/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Ignore all csv files ---
+*.csv
+*.xlsx
+
+# --- Office temporary lock files ---
+~$*
+*.tmp
+*.lock
+
+# ignore specific directories
+bt1/
+bt2/
+paper_trading/logs
+test_back/
+test_back_drl/
+test_back_Q/
+FinRL/
+results/
+lxyoutput/
+
+#keep specific files
+!paper_trading/data/mapping/tic_gvkey_mapping_2025.csv
+!paper_trading/data/raw_signals/drl_weight.csv
+!paper_trading/data/raw_signals/equal_weight.csv
+!paper_trading/data/raw_signals/min_var_weight.csv
+!paper_trading/data/raw_signals/mean_weight.csv
+!paper_trading/data/raw_signals/min_var_weight.csv  
