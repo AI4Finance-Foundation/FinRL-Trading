@@ -1,0 +1,29 @@
+strategies:
+- id: drl
+  path: ./data/raw_signals/drl_weight.csv
+  format: csv
+  column_mapping:
+    trade_date: trade_date
+    gvkey: asset_id
+    weights: target_weight
+- id: equal
+  path: ./data/raw_signals/equally_weighted.xlsx
+  format: xlsx
+  column_mapping:
+    trade_date: trade_date
+    gvkey: asset_id
+    weights: target_weight
+- id: meanvar
+  path: ./data/raw_signals/mean_weighted.xlsx
+  format: xlsx
+  column_mapping:
+    trade_date: trade_date
+    gvkey: asset_id
+    weights: target_weight
+- id: minvar
+  path: ./data/raw_signals/minimum_weighted.xlsx
+  format: xlsx
+  column_mapping:
+    trade_date: trade_date
+    gvkey: asset_id
+    weights: target_weight
