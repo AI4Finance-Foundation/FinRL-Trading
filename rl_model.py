@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import traceback
 
+import torch
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+USE_GPU = (DEVICE == "cuda")
+
 from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.svm import SVR
@@ -49,11 +53,47 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from stable_baselines3.common.vec_env import DummyVecEnv
 
+# ==== ADD：Fix for crash at end of vec env ====
+def _safe_DRL_prediction(model, environment, deterministic=True):
+    """
+    Run a test episode and ALWAYS return (account_value_df, actions_df),
+    even if the vec env ends early.
+    """
+    test_env, test_obs = environment.get_sb_env()
+    test_env.reset()
+    n_steps = len(environment.df.index.unique())
+    max_steps = n_steps - 1
 
+    account_memory = None
+    actions_memory = None
+
+    for i in range(n_steps):
+        action, _ = model.predict(test_obs, deterministic=deterministic)
+        test_obs, rewards, dones, info = test_env.step(action)
+
+        # Fetch memories either at last step or when done happens early
+        if (i == max_steps) or dones[0]:
+            account_memory = test_env.env_method("save_asset_memory")
+            actions_memory = test_env.env_method("save_action_memory")
+            if dones[0]:
+                print("hit end!")
+            break
+
+    # Fallback: if for any reason memories weren't fetched in the loop
+    if account_memory is None:
+        account_memory = test_env.env_method("save_asset_memory")
+    if actions_memory is None:
+        actions_memory = test_env.env_method("save_action_memory")
+
+    # env_method returns list-of-envs; take the first
+    return account_memory[0], actions_memory[0]
+
+# Apply the patch
+DRLAgent.DRL_prediction = staticmethod(_safe_DRL_prediction)
 
 def prepare_rolling_train(df, date_column, testing_window, max_rolling_window, trade_date):
     print(trade_date-max_rolling_window, trade_date-testing_window)
-    # 确保使用正确的列名 - data_split 期望 'date' 列
+    # ensure using correct column name - data_split expects 'date' column
     if 'datadate' in df.columns and 'date' not in df.columns:
         df_temp = df.rename(columns={'datadate': 'date'})
     else:
@@ -63,7 +103,7 @@ def prepare_rolling_train(df, date_column, testing_window, max_rolling_window, t
     return train
 
 def prepare_rolling_test(df, date_column, testing_window, max_rolling_window, trade_date):
-    # 确保使用正确的列名 - data_split 期望 'date' 列
+    # ensure using correct column name - data_split expects 'date' column
     if 'datadate' in df.columns and 'date' not in df.columns:
         df_temp = df.rename(columns={'datadate': 'date'})
     else:
@@ -81,9 +121,13 @@ def prepare_trade_data(df,features_column,label_column,date_column,tic_column,un
     return X_trade,y_trade,trade_tic
 
 
-def train_a2c(agent):
-
-    A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
+def train_a2c(agent,USE_GPU ):
+    #add GPU support 
+    #A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
+    if USE_GPU:
+        A2C_PARAMS = {"n_steps": 1024, "ent_coef": 0.005, "learning_rate": 0.0002, "device": DEVICE}
+    else:
+        A2C_PARAMS = {"n_steps": 5, "ent_coef": 0.005, "learning_rate": 0.0002}
     model_a2c = agent.get_model(model_name="a2c",model_kwargs = A2C_PARAMS)
     trained_a2c = agent.train_model(model=model_a2c, 
                                 tb_log_name='a2c',
@@ -91,12 +135,21 @@ def train_a2c(agent):
     
     return trained_a2c
 
-def train_ppo(agent):
-    PPO_PARAMS = {
-    "n_steps": 2048,
-    "ent_coef": 0.005,
-    "learning_rate": 0.0001,
-    "batch_size": 128,
+def train_ppo(agent,USE_GPU ):
+    if USE_GPU:
+        PPO_PARAMS = {
+        "n_steps": 2048,
+        "ent_coef": 0.005,
+        "learning_rate": 0.0001,
+        "batch_size": 1024,
+        "device": DEVICE}
+    else:
+
+        PPO_PARAMS = {
+        "n_steps": 2048,
+        "ent_coef": 0.005,
+        "learning_rate": 0.0001,
+        "batch_size": 128,
     }
     model_ppo = agent.get_model("ppo",model_kwargs = PPO_PARAMS)
     trained_ppo = agent.train_model(model=model_ppo, 
@@ -105,8 +158,12 @@ def train_ppo(agent):
 
     return trained_ppo
 
-def train_ddpg(agent):
-    DDPG_PARAMS = {"batch_size": 128, "buffer_size": 50000, "learning_rate": 0.001}
+def train_ddpg(agent,USE_GPU ):
+    if USE_GPU:
+        DDPG_PARAMS = {"batch_size": 1024, "buffer_size": 100000, "learning_rate": 0.001, "device": DEVICE}
+    else:
+        DDPG_PARAMS = {"batch_size": 128, "buffer_size": 50000, "learning_rate": 0.001}
+
     model_ddpg = agent.get_model("ddpg",model_kwargs = DDPG_PARAMS) 
 
     trained_ddpg = agent.train_model(model=model_ddpg, 
@@ -189,7 +246,7 @@ def run_models(df,date_column, trade_date, env_kwargs,
     
     # make sure right DataFrame
     df_ = df.copy()
-    print(f"After copy - df_ columns: {list(df_.columns)}")
+    #print(f"After copy - df_ columns: {list(df_.columns)}")
     
     X_train = prepare_rolling_train(df_, date_column, testing_window, max_rolling_window, trade_date)
     print(f"After prepare_rolling_train - X_train shape: {X_train.shape if hasattr(X_train, 'shape') else 'No shape'}")
@@ -202,9 +259,9 @@ def run_models(df,date_column, trade_date, env_kwargs,
     env_train, _ = e_train_gym.get_sb_env()
     agent = DRLAgent(env = env_train)
 
-    a2c_model = train_a2c(agent)
-    ppo_model = train_ppo(agent)
-    ddpg_model = train_ddpg(agent)
+    a2c_model = train_a2c(agent,USE_GPU )
+    ppo_model = train_ppo(agent,USE_GPU )
+    ddpg_model = train_ddpg(agent,USE_GPU )
     #td3_model = train_td3(agent)
     #sac_model = train_sac(agent)
     
@@ -236,9 +293,9 @@ def run_models(df,date_column, trade_date, env_kwargs,
         max_return = ddpg_return
         best_model = ddpg_model
 
-    df_daily_return, df_actions = DRLAgent.DRL_prediction(
-    model=ppo_model, environment=e_trade_gym
-)
+#    df_daily_return, df_actions = DRLAgent.DRL_prediction(
+#    model=ppo_model, environment=e_trade_gym
+#)
     #td3_return =list((df_daily_return.daily_return+1).cumprod())[-1] 
     #if td3_return > max_return:
     #    max_return = td3_return

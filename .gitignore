@@ -16,6 +16,20 @@ myenv/
 # --- Notebooks ---
 .ipynb_checkpoints/
 
+
+#keep specific files
+!paper_trading/data/mapping/tic_gvkey_mapping_2025.csv
+!paper_trading/data/raw_signals/drl_weight.csv
+!paper_trading/data/raw_signals/equally_weighted.csv
+!paper_trading/data/raw_signals/mean_weighted.csv
+!paper_trading/data/raw_signals/minimum_weighted.csv
+!output/QQQ.csv
+!output/SPX.csv
+!output/equally_weighted.xlsx
+!output/mean_weighted.xlsx
+!output/minimum_weighted.xlsx
+!output/drl_weight.xlsx
+
 # --- Ignore all csv xlsx pickle files ---
 *.csv
 *.xlsx

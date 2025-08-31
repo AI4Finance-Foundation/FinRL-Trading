@@ -1,0 +1,28 @@
+
+execution:
+  out_orders: ./data/outputs/planned_orders.csv
+  out_plan: ./data/outputs/rebalance_plan.csv
+  time_in_force: DAY
+  tp_pct: 0.05
+  sl_pct: 0.03
+
+
+alp_execution:
+  max_orders: 5
+  poll_fills: 1
+
+risk:
+  max_share_per_order: 100
+  max_notional_per_order: 1.0e9
+  max_total_notional: 1.0e12
+  price_tolerance_pct: 1.0
+  min_cash_buffer_pct: 0.0
+  reject_if_price_missing: false
+
+idempotency:
+  enable_client_order_id: true
+  client_order_id_prefix: TEST
+
+alpaca:
+  trading_endpoint: https://paper-api.alpaca.markets
+  data_endpoint: https://data.alpaca.markets
