@@ -45,6 +45,19 @@ class BacktestConfig:
     initial_capital: float = 1000000.0
     transaction_cost: float = 0.001  # 0.1% per trade
     benchmark_tickers: List[str] = None
+    # Optional: a bt.core.CostModel instance (e.g. bt.AlmgrenChrissCostModel(...)).
+    # When set, the engine passes it to bt.Backtest as `commissions=` together
+    # with auto-built volume / volatility frames. When None, the legacy
+    # transaction_cost flat-rate callable path is used (existing behaviour).
+    cost_model: Optional[Any] = None
+    # Rolling window for realised-volatility estimation (log-return stdev).
+    volatility_window: int = 20
+    # Forwarded to bt.Backtest. Default True preserves existing behaviour.
+    # Set False for large-notional books — bt's integer-share allocator can
+    # fail to converge with non-zero commissions at >~$100M (the bisection
+    # in bt.core.SecurityBase.allocate stops approaching the target outlay).
+    # bt's own cost-model example uses fractional shares for the same reason.
+    integer_positions: bool = True
 
     def __post_init__(self):
         if self.benchmark_tickers is None:
@@ -149,12 +162,11 @@ class BacktestEngine:
             # Create bt strategy from aligned weights
             bt_strategy = self._create_bt_strategy(strategy_name, ws)
 
-            # Create backtest with initial capital
-            backtest = bt.Backtest(
-                bt_strategy,
-                price_data_clean,
-                initial_capital=self.config.initial_capital,
-                commissions=lambda q, p: abs(q) * p * self.config.transaction_cost
+            # Build the bt.Backtest. When a CostModel is configured, route it
+            # through the new bt cost-model API together with volume +
+            # volatility frames; otherwise keep the original flat-rate path.
+            backtest = self._build_bt_backtest(
+                bt_strategy, price_data_clean, price_data
             )
 
             # Run backtest
@@ -228,6 +240,83 @@ class BacktestEngine:
         price_data.index = pd.to_datetime(price_data.index)
         price_data = price_data.ffill().dropna(how='all')
         return price_data
+
+    def _build_volume_volatility(self, price_data_long: pd.DataFrame,
+                                  price_data_wide: pd.DataFrame
+                                  ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Build volume and rolling-volatility frames aligned to price_data_wide.
+
+        - Volume comes from the `cshtrd` column produced by data_fetcher
+          (already in the SQLite price_data table as the `volume` column).
+        - Volatility is the rolling stdev of log-returns over
+          `config.volatility_window` business days, computed from `adj_close`.
+        Both frames are reindexed onto `price_data_wide.index` and
+        `price_data_wide.columns` so they line up with the price frame bt sees.
+        """
+        idx = price_data_wide.index
+        cols = price_data_wide.columns
+
+        # ---- volume ----
+        missing = [c for c in ('cshtrd', 'tic', 'datadate')
+                   if c not in price_data_long.columns]
+        if missing:
+            raise ValueError(
+                f"cost_model is configured but price_data is missing required "
+                f"column(s) {missing}; nonlinear cost models need per-ticker "
+                f"daily volume (cshtrd) to compute participation rate."
+            )
+        vol_long = price_data_long[['datadate', 'tic', 'cshtrd']].copy()
+        vol_long['datadate'] = pd.to_datetime(vol_long['datadate'])
+        volume_df = (vol_long
+                     .pivot_table(index='datadate', columns='tic',
+                                  values='cshtrd', aggfunc='last')
+                     .reindex(index=idx, columns=cols)
+                     .ffill())
+
+        # Cost models divide by V; avoid zeros/NaNs.
+        volume_df = volume_df.replace(0, np.nan).ffill().fillna(1.0)
+
+        # ---- volatility ----
+        win = max(int(self.config.volatility_window), 2)
+        log_ret = np.log(price_data_wide / price_data_wide.shift()).fillna(0.0)
+        vol_df = (log_ret.rolling(win, min_periods=1)
+                          .std()
+                          .reindex(index=idx, columns=cols))
+        # Cost models multiply by sigma; first row will be NaN → 0 fee that day.
+        vol_df = vol_df.fillna(0.0)
+
+        return volume_df, vol_df
+
+    def _build_bt_backtest(self, bt_strategy, price_data_wide: pd.DataFrame,
+                           price_data_long: pd.DataFrame) -> "bt.Backtest":
+        """Construct a bt.Backtest, switching to the CostModel API when configured."""
+        cost_model = getattr(self.config, 'cost_model', None)
+        integer_positions = getattr(self.config, 'integer_positions', True)
+        if cost_model is not None and isinstance(cost_model, bt.core.CostModel):
+            volume_df, volatility_df = self._build_volume_volatility(
+                price_data_long, price_data_wide
+            )
+            self.logger.info(
+                f"Using bt CostModel: {type(cost_model).__name__} "
+                f"(volume {volume_df.shape}, volatility {volatility_df.shape})"
+            )
+            return bt.Backtest(
+                bt_strategy,
+                price_data_wide,
+                initial_capital=self.config.initial_capital,
+                commissions=cost_model,
+                volume=volume_df,
+                volatility=volatility_df,
+                integer_positions=integer_positions,
+            )
+        # Legacy fixed-fee path (unchanged default behaviour).
+        return bt.Backtest(
+            bt_strategy,
+            price_data_wide,
+            initial_capital=self.config.initial_capital,
+            commissions=lambda q, p: abs(q) * p * self.config.transaction_cost,
+            integer_positions=integer_positions,
+        )
 
     def _create_bt_strategy(self, strategy_name: str, weight_signals: pd.DataFrame) -> bt.Strategy:
         """Create bt strategy from weight signals."""
@@ -439,13 +528,10 @@ class BacktestEngine:
                     ]
                 )
 
-                # Create and run backtest
-                backtest = bt.Backtest(
-                    bh_strategy,
-                    bm_prices,
-                    initial_capital=self.config.initial_capital,
-                    commissions=lambda q, p: abs(q) * p * self.config.transaction_cost
-                )
+                # Create and run backtest (use the same cost-model path the
+                # main strategy uses, so benchmark and strategy stay
+                # apples-to-apples).
+                backtest = self._build_bt_backtest(bh_strategy, bm_prices, bm_data)
                 result = bt.run(backtest)
 
                 # Extract results

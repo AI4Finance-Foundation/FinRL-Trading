@@ -28,7 +28,7 @@ pandas-market-calendars>=4.3.0
 # Alternative: exchange-calendars>=4.2.0  # Uncomment if you prefer exchange-calendars
 
 # Professional backtesting
-bt>=1.1.0
+bt>=1.2.0
 
 # Configuration and validation
 pydantic>=2.5.0
