@@ -954,6 +954,54 @@ def main():
     pred_all["rank_best"] = pred_all.groupby(["bucket", "datadate"])["predicted_return"].rank(ascending=False).astype(int)
     pred_all["rank_ensemble"] = pred_all.groupby(["bucket", "datadate"])["pred_ensemble_avg"].rank(ascending=False).astype(int)
 
+    # ---- Actual return calculation for inference rows (ref-date → end-date) ----
+    if args.ref_date and not args.latest_snapshot:
+        from datetime import date
+        ref_dt = pd.Timestamp(args.ref_date)
+        end_dt = pd.Timestamp(args.end_date) if args.end_date else pd.Timestamp(date.today())
+        # Identify inference rows (datadate > val_cutoff or synthetic like "mixed")
+        infer_mask = pred_all["datadate"].apply(
+            lambda d: d in ("mixed", "latest") or (isinstance(d, str) and d > args.val_cutoff)
+        )
+        infer_tickers = pred_all.loc[infer_mask, "tic"].unique().tolist()
+        if infer_tickers:
+            print(f"\n  Calculating actual returns: {ref_dt.date()} → {end_dt.date()} for {len(infer_tickers)} tickers ...")
+            import yfinance as yf
+            yf_tickers = [t.replace(".", "-") for t in infer_tickers] + ["SPY"]
+            dl_start = (ref_dt - pd.Timedelta(days=5)).strftime("%Y-%m-%d")
+            dl_end = (end_dt + pd.Timedelta(days=3)).strftime("%Y-%m-%d")
+            try:
+                px = yf.download(yf_tickers, start=dl_start, end=dl_end, auto_adjust=True, progress=False)
+                close = px["Close"] if isinstance(px.columns, pd.MultiIndex) else px[["Close"]]
+                # Buy: first trading day >= ref_date
+                buy_dates = close.loc[ref_dt.strftime("%Y-%m-%d"):].index
+                sell_dates = close.loc[:end_dt.strftime("%Y-%m-%d")].index
+                if len(buy_dates) > 0 and len(sell_dates) > 0:
+                    buy_d = buy_dates[0]
+                    sell_d = sell_dates[-1]
+                    y_rets = {}
+                    for tic in infer_tickers:
+                        yf_t = tic.replace(".", "-")
+                        if yf_t in close.columns:
+                            try:
+                                p_buy = float(close.loc[buy_d, yf_t])
+                                p_sell = float(close.loc[sell_d, yf_t])
+                                if p_buy > 0:
+                                    y_rets[tic] = (p_sell / p_buy) - 1
+                            except Exception:
+                                pass
+                    pred_all.loc[infer_mask, "y_return"] = pred_all.loc[infer_mask, "tic"].map(y_rets)
+                    filled = pred_all.loc[infer_mask, "y_return"].notna().sum()
+                    spy_ret = ""
+                    if "SPY" in close.columns:
+                        try:
+                            spy_ret = f" (SPY: {(float(close.loc[sell_d, 'SPY']) / float(close.loc[buy_d, 'SPY']) - 1) * 100:+.1f}%)"
+                        except Exception:
+                            pass
+                    print(f"  Actual returns filled: {filled}/{len(infer_tickers)}{spy_ret}")
+            except Exception as e:
+                print(f"  WARNING: yfinance download failed: {e}")
+
     # Save — prefix filenames with universe name + tradedate tag + timestamp
     os.makedirs(args.output_dir, exist_ok=True)
     prefix = f"{args.universe}_" if args.universe else "sp500_"
