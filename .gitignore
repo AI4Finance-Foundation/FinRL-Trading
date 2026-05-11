@@ -167,3 +167,5 @@ Thumbs.db
 
 TODO
 GEMINI.md
+outputs/*
+venv_pyenv_backup/
