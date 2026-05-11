@@ -15,10 +15,10 @@ strategy:
 # -----------------------
 paths:
   data_root: ./data/fmp_daily
-  output_root: ./src/strategies/output
-  state_dir: ./src/strategies/output/state/adaptive_rotation
-  audit_dir: ./src/strategies/output/audit/adaptive_rotation
-  weights_dir: ./src/strategies/output/weights/adaptive_rotation
+  output_root: ./outputs/strategies/adaptive_rotation
+  state_dir: ./outputs/strategies/adaptive_rotation/state
+  audit_dir: ./outputs/strategies/adaptive_rotation/audit
+  weights_dir: ./outputs/strategies/adaptive_rotation/weights
 
 # -----------------------
 # Dates & History

@@ -80,6 +80,21 @@ MOMENTUM_COLS = [
     "ret_1q", "ret_4q", "ret_accel",
     # Fundamental momentum (QoQ changes)
     "eps_chg", "roe_chg", "gm_chg", "om_chg",
+    # Price-range position: where does current price sit in its N-quarter range?
+    # 0.0 = at period low, 1.0 = at period high  (Stochastic over longer windows)
+    "price_pos_3m",   # 1-quarter lookback  (~3 months)
+    "price_pos_6m",   # 2-quarter lookback  (~6 months)
+    "price_pos_1y",   # 4-quarter lookback  (~1 year)
+    "price_pos_2y",   # 8-quarter lookback  (~2 years)
+    # EMA deviation: log(price / EMA(N quarters)), clipped at ±0.5
+    # Positive = price above EMA (bullish), negative = below (bearish)
+    "vs_ema_2q",    # ~6-month  EMA  (short-term)
+    "vs_ema_4q",    # ~1-year   EMA  (mid-term)
+    "vs_ema_8q",    # ~2-year   EMA  (mid/long-term)
+    "vs_ema_12q",   # ~3-year   EMA  (long-term)
+    # Bollinger Bands (8-quarter window, std=2): %B position
+    "bb_pct_q",     # 0=at lower band, 1=at upper band
+    "bb_width_q",   # (upper-lower)/mid — volatility expansion signal
 ]
 
 # datadate → tradedate mapping (first day of next-next month)
@@ -269,17 +284,25 @@ def run_bucket(bucket, bdf, feature_cols, val_cutoff="2025-12-31", val_quarters=
         weights = {k: v / total_w for k, v in weights.items()}
     infer_b["pred_ensemble_avg"] = sum(infer_b[col] * w for col, w in weights.items())
 
-    infer_b = infer_b.sort_values(["datadate", "predicted_return"], ascending=[True, False])
+    infer_b = infer_b.sort_values(["datadate", "pred_ensemble_avg"], ascending=[True, False])
 
     # Print ranking per quarter
     for idate in infer_dates:
-        qdf = infer_b[infer_b["datadate"] == idate].sort_values("predicted_return", ascending=False)
-        actual_col = "y_return" if "y_return" in qdf.columns and qdf["y_return"].notna().any() else None
+        qdf = infer_b[infer_b["datadate"] == idate].sort_values(
+            "pred_ensemble_avg", ascending=False
+        )
+        actual_col = (
+            "y_return" if "y_return" in qdf.columns and qdf["y_return"].notna().any() else None
+        )
         print(f"\n  Ranking ({idate}, {len(qdf)} stocks):")
         for i, (_, r) in enumerate(qdf.head(10).iterrows()):
             marker = " ***" if i < 3 else ""
-            actual = f"  actual={r['y_return'] * 100:+.1f}%" if actual_col and pd.notna(r.get("y_return")) else ""
-            print(f"    {i + 1:2d}. {r['tic']:6s}  pred={r['predicted_return'] * 100:+6.1f}%{actual}{marker}")
+            actual = (
+                f"  actual={r['y_return'] * 100:+.1f}%"
+                if actual_col and pd.notna(r.get("y_return"))
+                else ""
+            )
+            print(f"    {i + 1:2d}. {r['tic']:6s}  pred={r['pred_ensemble_avg'] * 100:+6.1f}%{actual}{marker}")
 
     # Feature importance (collect from all models that expose it)
     importance_records = []
@@ -485,7 +508,7 @@ def main():
                         help="Filter to a stock universe: sp500, nasdaq100, or path to CSV with 'tickers' column")
     parser.add_argument("--val-cutoff", default="2025-12-31", help="Validation end date (last val quarter)")
     parser.add_argument("--val-quarters", type=int, default=3, help="Number of validation quarters (default: 3)")
-    parser.add_argument("--output-dir", default=os.path.join(project_root, "data"))
+    parser.add_argument("--output-dir", default=os.path.join(project_root, "outputs", "selection"))
     parser.add_argument("--latest-snapshot", action="store_true",
                         help="Inference using latest available filing per ticker (fill missing with previous quarter)")
     parser.add_argument("--mixed-vintage", action="store_true",
@@ -511,6 +534,8 @@ def main():
     universe_name = (args.universe or "sp500").lower()
 
     # Load data
+    print(f"DEBUG: args.db is {args.db}")
+    print(f"DEBUG: args.db exists: {os.path.exists(args.db)}")
     conn = sqlite3.connect(args.db)
     _feat_sql = ", ".join(FEATURE_COLS)
     df = pd.read_sql(
@@ -568,6 +593,7 @@ def main():
     df = df.sort_values(["tic", "datadate"]).copy()
     df["adj_close_q"] = pd.to_numeric(df["adj_close_q"], errors="coerce")
     df["trade_price"] = pd.to_numeric(df["trade_price"], errors="coerce")
+    df["y_return"] = pd.to_numeric(df["y_return"], errors="coerce")
 
     # Fill NULL trade_price (future tradedate) with today's price for momentum calc
     import yfinance as yf
@@ -643,12 +669,70 @@ def main():
         df[src] = pd.to_numeric(df[src], errors="coerce")
         df[dst] = df.groupby("tic")[src].diff()
 
+    # ---- Price-range position: (price - period_low) / (period_high - period_low) ----
+    # Quarters are approximately 3-month intervals in quarterly fundamental data
+    for col, n_quarters in [("price_pos_3m", 1), ("price_pos_6m", 2),
+                            ("price_pos_1y", 4), ("price_pos_2y", 8)]:
+        def _price_pos(series, n=n_quarters):
+            roll_min = series.rolling(n + 1, min_periods=2).min()
+            roll_max = series.rolling(n + 1, min_periods=2).max()
+            rng = roll_max - roll_min
+            return (series - roll_min) / rng.replace(0, np.nan)
+        df[col] = df.groupby("tic")["trade_price"].transform(
+            lambda s, _n=n_quarters: _price_pos(s, _n)
+        ).clip(0.0, 1.0).fillna(0.5)
+
+    # ---- EMA deviation: log(price / EMA(N quarters)), clipped at ±0.5 ----
+    # log-ratio is more symmetric and stable than arithmetic price/ema - 1
+    for col, n_q in [("vs_ema_2q", 2), ("vs_ema_4q", 4),
+                     ("vs_ema_8q", 8), ("vs_ema_12q", 12)]:
+        def _vs_ema_log(series, span=n_q):
+            ema = series.ewm(span=span, adjust=False).mean()
+            ratio = (series / ema.replace(0, np.nan)).replace([np.inf, -np.inf], np.nan)
+            return np.log(ratio).clip(-0.5, 0.5)
+        df[col] = df.groupby("tic")["trade_price"].transform(
+            lambda s, _n=n_q: _vs_ema_log(s, _n)
+        ).fillna(0.0)
+
+    # ---- Bollinger Bands (8-quarter window, std=2) ----
+    def _bb_features(series, period=8):
+        mid   = series.rolling(period, min_periods=3).mean()
+        std   = series.rolling(period, min_periods=3).std()
+        upper = mid + 2 * std
+        lower = mid - 2 * std
+        rng   = (upper - lower).replace(0, np.nan)
+        pct   = ((series - lower) / rng).clip(-0.5, 1.5)
+        width = (rng / mid.replace(0, np.nan)).clip(0, 1)
+        return pd.DataFrame({"bb_pct_q": pct, "bb_width_q": width})
+
+    bb_df = df.groupby("tic")["trade_price"].apply(_bb_features).reset_index(level=0, drop=True)
+    df["bb_pct_q"]   = bb_df["bb_pct_q"].fillna(0.5)
+    df["bb_width_q"] = bb_df["bb_width_q"].fillna(0.0)
+
     # Prep features (ret_accel excluded here, computed after winsorize)
     pre_accel_feats = [c for c in FEATURE_COLS + MOMENTUM_COLS if c != "ret_accel"]
     for c in pre_accel_feats:
         df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Assign buckets first so we can use them for smarter imputation
+    df["bucket"] = df["gsector"].str.lower().map(SECTOR_TO_BUCKET)
+    df["bucket"] = df["bucket"].fillna("cyclical")  # safe fallback for unmapped sectors
+
+    # Replace inf with nan BEFORE calculating medians
+    df[pre_accel_feats] = df[pre_accel_feats].replace([np.inf, -np.inf], np.nan)
+
+    # Smart imputation: per-bucket median (prevents REITs/Utilities getting global tech medians)
+    for _bucket in df["bucket"].unique():
+        _mask = df["bucket"] == _bucket
+        _bucket_medians = df.loc[_mask, pre_accel_feats].median()
+        df.loc[_mask, pre_accel_feats] = df.loc[_mask, pre_accel_feats].fillna(_bucket_medians)
+
+    # Final fallback for anything still NaN (e.g. whole bucket missing a feature)
     global_medians = df[pre_accel_feats].median()
-    df[pre_accel_feats] = df[pre_accel_feats].fillna(global_medians).replace([np.inf, -np.inf], np.nan).fillna(0)
+    df[pre_accel_feats] = df[pre_accel_feats].fillna(global_medians).fillna(0)
+
+    # Hard cap to prevent massive float overflows (e.g. 1e100) before quantile clip
+    df[pre_accel_feats] = df[pre_accel_feats].clip(lower=-1e6, upper=1e6)
 
     # Winsorize: clip at 1st/99th percentile to reduce outlier impact
     for c in pre_accel_feats:
@@ -657,16 +741,16 @@ def main():
 
     # Compute ret_accel from winsorized ret_1q/ret_4q, then winsorize it too
     df["ret_accel"] = df["ret_1q"] - df["ret_4q"] / 4
-    df["ret_accel"] = df["ret_accel"].fillna(0)
+    df["ret_accel"] = df["ret_accel"].replace([np.inf, -np.inf], np.nan).fillna(0)
+    df["ret_accel"] = df["ret_accel"].clip(lower=-1e6, upper=1e6)
     p01, p99 = df["ret_accel"].quantile(0.01), df["ret_accel"].quantile(0.99)
     df["ret_accel"] = df["ret_accel"].clip(lower=p01, upper=p99)
     print(f"Added {len(MOMENTUM_COLS)} momentum features: {MOMENTUM_COLS}")
 
-    # Assign buckets
-    df["bucket"] = df["gsector"].str.lower().map(SECTOR_TO_BUCKET)
-    unmapped = df[df["bucket"].isna()]["gsector"].unique()
+    # (Bucket already assigned above; report any unmapped sectors)
+    unmapped = df[df["gsector"].str.lower().map(SECTOR_TO_BUCKET).isna()]["gsector"].unique()
     if len(unmapped) > 0:
-        print(f"WARNING: unmapped sectors: {unmapped}")
+        print(f"WARNING: unmapped sectors (filled with 'cyclical'): {unmapped}")
     df = df[df["bucket"].notna()].copy()
 
     # Latest-snapshot mode: for inference, use the most recent filing per ticker
@@ -898,15 +982,20 @@ def main():
         pred_all.to_csv(pred_path, index=False)
         print(f"\nSaved: {pred_path} ({len(pred_all)} stocks)")
 
-        # Excel dashboard
-        excel_path = os.path.join(args.output_dir, f"{prefix}ml_dashboard_{trade_tag}_{timestamp}.xlsx")
-        with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-            pred_all.sort_values("rank_best").to_excel(writer, sheet_name="Rankings", index=False)
-            pd.DataFrame(all_model_results).to_excel(writer, sheet_name="Models", index=False)
-            if all_importances:
-                pd.DataFrame(all_importances).to_excel(writer, sheet_name="Features", index=False)
-        print(f"Saved: {excel_path}")
-        print(f"Dashboard: python3 src/tools/dashboard.py {excel_path}")
+        model_path_u = os.path.join(
+            args.output_dir, f"{prefix}ml_unified_model_results_{trade_tag}_{timestamp}.csv"
+        )
+        pd.DataFrame(all_model_results).to_csv(model_path_u, index=False)
+        print(f"Saved: {model_path_u} ({len(all_model_results)} rows)")
+        if all_importances:
+            imp_path_u = os.path.join(
+                args.output_dir,
+                f"{prefix}ml_unified_feature_importance_{trade_tag}_{timestamp}.csv",
+            )
+            pd.DataFrame(all_importances).to_csv(imp_path_u, index=False)
+            print(f"Saved: {imp_path_u} ({len(all_importances)} rows)")
+
+        print(f"Dashboard: python3 src/tools/dashboard.py {pred_path}")
 
         # Summary: top 10 overall
         print(f"\n{'='*60}")
@@ -914,11 +1003,15 @@ def main():
         print(f"{'='*60}")
         has_actual = "y_return" in pred_all.columns and pred_all["y_return"].notna().any()
         for idate in sorted(pred_all["datadate"].unique()):
-            qdf = pred_all[pred_all["datadate"] == idate].sort_values("rank_best")
+            qdf = pred_all[pred_all["datadate"] == idate].sort_values("rank_ensemble")
             print(f"\n  --- {idate} ({len(qdf)} stocks) ---")
             for i, (_, r) in enumerate(qdf.head(10).iterrows(), 1):
-                actual = f"  actual={r['y_return']*100:+.1f}%" if has_actual and pd.notna(r.get("y_return")) else ""
-                print(f"    {i:>2}. {r['tic']:<8} pred={r['predicted_return']*100:+.1f}%{actual}")
+                actual = (
+                    f"  actual={r['y_return']*100:+.1f}%"
+                    if has_actual and pd.notna(r.get("y_return"))
+                    else ""
+                )
+                print(f"    {i:>2}. {r['tic']:<8} pred={r['pred_ensemble_avg']*100:+.1f}%{actual}")
             if has_actual and qdf.head(5)["y_return"].notna().any():
                 avg5 = qdf.head(5)["y_return"].mean() * 100
                 avg10 = qdf.head(10)["y_return"].mean() * 100
@@ -1002,6 +1095,30 @@ def main():
             except Exception as e:
                 print(f"  WARNING: yfinance download failed: {e}")
 
+    # Column ordering for readable CSV output
+    desired_order = [
+        "tic", "datadate", "tradedate", "gsector", "bucket",
+        "predicted_return", "best_model",
+        "pred_RF", "pred_XGB", "pred_LGBM", "pred_HistGBM",
+        "pred_ExtraTrees", "pred_Ridge", "pred_Stacking", "pred_ensemble_avg",
+        "rank_best", "rank_ensemble",
+        "adj_close_q", "trade_price", "filing_date", "accepted_date",
+        "pe", "ps", "pb", "peg", "ev_multiple",
+        "EPS", "roe", "gross_margin", "operating_margin",
+        "fcf_per_share", "cash_per_share", "capex_per_share", "fcf_to_ocf", "ocf_ratio",
+        "debt_ratio", "debt_to_equity", "debt_to_mktcap", "cur_ratio",
+        "acc_rec_turnover", "asset_turnover", "payables_turnover",
+        "interest_coverage", "debt_service_coverage",
+        "dividend_yield", "solvency_ratio", "BPS", "y_return",
+        "ret_1q", "ret_4q", "eps_chg", "roe_chg", "gm_chg", "om_chg", "ret_accel",
+        "price_pos_3m", "price_pos_6m", "price_pos_1y", "price_pos_2y",
+        "vs_ema_2q", "vs_ema_4q", "vs_ema_8q", "vs_ema_12q",
+        "bb_pct_q", "bb_width_q",
+    ]
+    final_cols = [c for c in desired_order if c in pred_all.columns]
+    final_cols += [c for c in pred_all.columns if c not in desired_order]
+    pred_all = pred_all[final_cols]
+
     # Save — prefix filenames with universe name + tradedate tag + timestamp
     os.makedirs(args.output_dir, exist_ok=True)
     prefix = f"{args.universe}_" if args.universe else "sp500_"
@@ -1017,30 +1134,28 @@ def main():
         else:
             trade_tag = pd.Timestamp.now().strftime("%Y%m%d")
 
-    pred_path = os.path.join(args.output_dir, f"{prefix}ml_bucket_predictions_{trade_tag}_{timestamp}.csv")
+    pred_path = os.path.join(
+        args.output_dir, f"{prefix}ml_bucket_predictions_{trade_tag}_{timestamp}.csv"
+    )
     pred_all.to_csv(pred_path, index=False)
     print(f"\nSaved: {pred_path} ({len(pred_all)} stocks)")
 
-    model_path = os.path.join(args.output_dir, f"{prefix}ml_bucket_model_results_{trade_tag}_{timestamp}.csv")
+    model_path = os.path.join(
+        args.output_dir, f"{prefix}ml_bucket_model_results_{trade_tag}_{timestamp}.csv"
+    )
     pd.DataFrame(all_model_results).to_csv(model_path, index=False)
 
     if all_importances:
         imp_df = pd.DataFrame(all_importances)
         imp_df = imp_df.sort_values(["bucket", "model", "rank"])
-        imp_path = os.path.join(args.output_dir, f"{prefix}ml_feature_importance_{trade_tag}_{timestamp}.csv")
+        imp_path = os.path.join(
+            args.output_dir, f"{prefix}ml_feature_importance_{trade_tag}_{timestamp}.csv"
+        )
         imp_df.to_csv(imp_path, index=False)
         print(f"Saved: {imp_path} ({len(imp_df)} rows)")
     print(f"Saved: {model_path} ({len(all_model_results)} rows)")
 
-    # Excel dashboard
-    excel_path = os.path.join(args.output_dir, f"{prefix}ml_dashboard_{trade_tag}_{timestamp}.xlsx")
-    with pd.ExcelWriter(excel_path, engine="openpyxl") as writer:
-        pred_all.sort_values("rank_best").to_excel(writer, sheet_name="Rankings", index=False)
-        pd.DataFrame(all_model_results).to_excel(writer, sheet_name="Models", index=False)
-        if all_importances:
-            pd.DataFrame(all_importances).to_excel(writer, sheet_name="Features", index=False)
-    print(f"Saved: {excel_path}")
-    print(f"Dashboard: python3 src/tools/dashboard.py {excel_path}")
+    print(f"Dashboard: python3 src/tools/dashboard.py {pred_path}")
 
     # Summary per quarter
     print(f"\n{'=' * 60}")
@@ -1049,13 +1164,19 @@ def main():
     for idate in sorted(pred_all["datadate"].unique()):
         print(f"\n  --- {idate} ---")
         for bucket in ["growth_tech", "cyclical", "real_assets", "defensive"]:
-            bp = pred_all[(pred_all["bucket"] == bucket) & (pred_all["datadate"] == idate)].sort_values("rank_best").head(3)
+            bp = (
+                pred_all[
+                    (pred_all["bucket"] == bucket) & (pred_all["datadate"] == idate)
+                ]
+                .sort_values("rank_ensemble")
+                .head(3)
+            )
             if len(bp) == 0:
                 print(f"  {bucket:15s}: no data")
                 continue
             best_m = bp.iloc[0]["best_model"]
             picks = ", ".join(
-                f"{r['tic']}({r['predicted_return'] * 100:+.1f}%)" for _, r in bp.iterrows()
+                f"{r['tic']}({r['pred_ensemble_avg'] * 100:+.1f}%)" for _, r in bp.iterrows()
             )
             print(f"  {bucket:15s} [{best_m}]: {picks}")
 
@@ -1139,6 +1260,16 @@ def main():
         # Also compute uniform α=0.5 for comparison
         mixed["score_uniform"] = 0.5 * mixed["unified_pctile"] + 0.5 * mixed["bucket_pctile"]
         mixed["rank_uniform"] = mixed.groupby(["bucket", "datadate"])["score_uniform"].rank(ascending=False).astype(int)
+
+        # Populate tradedate for mixed-vintage rows (original_datadate → tradedate)
+        if "tradedate" not in mixed.columns:
+            mixed["tradedate"] = None
+        if "original_datadate" in mixed.columns:
+            _mask = mixed["tradedate"].isna() & mixed["original_datadate"].notna()
+            if _mask.any():
+                mixed.loc[_mask, "tradedate"] = mixed.loc[_mask, "original_datadate"].apply(
+                    datadate_to_tradedate
+                )
 
         has_actual = "y_return" in mixed.columns and mixed["y_return"].notna().any()
         buckets = ["growth_tech", "cyclical", "real_assets", "defensive"]

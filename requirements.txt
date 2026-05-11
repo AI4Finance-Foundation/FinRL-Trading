@@ -41,7 +41,7 @@ sqlalchemy>=2.0.0
 pathlib>=1.0.1
 typing-extensions>=4.8.0
 lxml>=4.9.0  # For pandas.read_html
-finnhub>=2.4.19
+finnhub-python>=2.4.19
 
 # Development and testing
 pytest>=7.4.0
@@ -50,11 +50,12 @@ black>=23.0.0
 flake8>=6.1.0
 mypy>=1.7.0
 
-# Optional: Deep learning capabilities
+# Optional: Deep learning / RL capabilities (uncomment if needed)
 torch>=2.0.0
+stable-baselines3>=2.0.0
 
-# Documentation
-sphinx>=7.2.0
+# Documentation (uncomment if building docs)
+# sphinx>=7.2.0
 
 # Packaging
 setuptools>=68.0.0

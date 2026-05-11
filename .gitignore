@@ -130,7 +130,11 @@ dmypy.json
 
 # Project specific
 /data/*
+/data/fmp_daily/*
+/data/*.csv
 src/strategies/output/
+outputs/
+venv_pyenv_backup
 logs/
 *.db
 *.sqlite
@@ -141,6 +145,8 @@ tmp/
 SecretDoc/
 examples/data/
 awsConnect
+__pycache__/
+*.pyc
 
 # IDE
 .vscode/
@@ -160,3 +166,4 @@ ehthumbs.db
 Thumbs.db
 
 TODO
+GEMINI.md

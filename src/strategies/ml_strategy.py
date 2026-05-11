@@ -81,6 +81,7 @@ class MLStockSelectionStrategy(BaseStrategy):
             config: Strategy configuration
         """
         super().__init__(config)
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def _compute_min_variance_weights(self, 
                                      selected_gvkeys: List[str], 
