@@ -55,7 +55,7 @@ where $\mathcal{S}$ denotes stock selection, $\mathcal{A}$ portfolio allocation,
 
 | Layer | Role | Components |
 |:------|:-----|:-----------|
-| **Data** | Unified market data pipeline | FMP, Yahoo Finance, WRDS; LLM sentiment preprocessing; SQLite cache |
+| **Data** | Unified market data pipeline | FMP, Yahoo Finance, WRDS; optional [Adanos market sentiment](docs/adanos_sentiment_features.md); LLM sentiment preprocessing; SQLite cache |
 | **Strategy** | Weight-centric signal generation | Stock selection, portfolio allocation, timing adjustment, risk overlay |
 | **Backtest** | Offline evaluation | `bt`-powered engine with multi-benchmark comparison and transaction costs |
 | **Execution** | Live/paper trading | Alpaca multi-account integration with pre-trade risk checks |
