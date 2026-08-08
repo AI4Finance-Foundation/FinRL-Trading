@@ -8,7 +8,7 @@ Centralized configuration management using Pydantic settings.
 import os
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from pydantic import validator
+from pydantic import Field, validator
 from pydantic_settings import BaseSettings
 from pydantic.types import SecretStr
 from dotenv import load_dotenv
@@ -119,9 +119,100 @@ class TradingSettings(BaseSettings):
     execution_timeout: int = 300
     log_orders: bool = True
     order_log_path: str = "./logs/orders"
+    default_broker: str = "alpaca"  # 'alpaca' or 'mt5'
 
     class Config:
         env_prefix = "TRADING_"
+
+    @validator('default_broker')
+    def validate_default_broker(cls, v):
+        if v not in ('alpaca', 'mt5'):
+            raise ValueError(f"default_broker must be 'alpaca' or 'mt5', got '{v}'")
+        return v
+
+
+class MT5Settings(BaseSettings):
+    """MetaTrader 5 configuration settings - enterprise production grade."""
+    # Connection settings
+    path: Optional[str] = None
+    login: Optional[int] = None
+    password: Optional[str] = None
+    server: Optional[str] = None
+    timeout: int = 60000
+    portable: bool = False
+    enable_hedging: bool = False
+    
+    # Trading defaults
+    max_slippage_points: int = 50
+    default_magic: int = 100001
+    default_comment: str = "FinRL-X"
+    
+    # Position sizing and risk
+    max_position_size_pct: float = 0.20
+    max_deviation_points: int = 50
+    max_drawdown_pct: float = 0.25
+    rebalance_safety_buffer: float = 0.05
+    batch_order_delay_ms: int = 100
+    
+    # Symbol mapping
+    symbol_map: Dict[str, str] = Field(default_factory=dict)
+    
+    # Multi-account settings
+    enable_multi_account: bool = False
+    
+    # Daily loss limits
+    daily_loss_limit: bool = False
+    max_daily_loss: float = 1000.0
+    
+    # Risk management
+    max_correlation: float = 0.80
+    max_sector_exposure: float = 0.30
+    
+    # Kill switch
+    enable_kill_switch: bool = False
+    kill_switch_drawdown_pct: float = 0.30
+    
+    # Bridge server (ZeroMQ)
+    bridge_port: int = 5555
+    bridge_enabled: bool = False
+    bridge_auth_token: str = ""
+    
+    # Streaming service
+    streaming_enabled: bool = False
+    streaming_interval_ms: int = 1000
+    
+    # Sync services
+    sync_enabled: bool = True
+    sync_interval_seconds: int = 5
+    position_sync_interval_seconds: int = 10
+    enable_order_sync_service: bool = True
+    order_sync_interval_seconds: int = 3
+    
+    # Order timeout and retry
+    order_timeout_seconds: int = 30
+    max_retry_attempts: int = 3
+    retry_delay_seconds: int = 1
+    
+    # Market clock
+    enable_market_clock: bool = True
+    
+    # Recovery
+    enable_auto_recovery: bool = True
+    state_snapshot_path: str = "./data/mt5_state"
+    
+    # Logging
+    log_mt5_orders: bool = True
+    log_mt5_metrics: bool = True
+    log_mt5_audit: bool = True
+
+    @validator('bridge_auth_token')
+    def validate_bridge_auth_token(cls, v, values):
+        if (values.get('bridge_enabled') or values.get('streaming_enabled')) and (not v or not v.strip()):
+            raise ValueError('bridge_auth_token must be non-empty when bridge or streaming is enabled')
+        return v
+
+    class Config:
+        env_prefix = "MT5_"
 
 
 class WebSettings(BaseSettings):
@@ -162,6 +253,7 @@ class FinRLSettings(BaseSettings):
     data: DataSettings = DataSettings()
     strategy: StrategySettings = StrategySettings()
     trading: TradingSettings = TradingSettings()
+    mt5: MT5Settings = MT5Settings()
     web: WebSettings = WebSettings()
     logging: LoggingSettings = LoggingSettings()
 
@@ -299,6 +391,19 @@ TRADING_RISK_CHECKS_ENABLED=true
 TRADING_EXECUTION_TIMEOUT=300
 TRADING_LOG_ORDERS=true
 TRADING_ORDER_LOG_PATH=./logs/orders
+TRADING_DEFAULT_BROKER=alpaca
+
+# MT5 Settings
+MT5_PATH=
+MT5_LOGIN=
+MT5_PASSWORD=
+MT5_SERVER=
+MT5_TIMEOUT=60000
+MT5_PORTABLE=false
+MT5_ENABLE_HEDGING=false
+MT5_MAX_SLIPPAGE_POINTS=50
+MT5_DEFAULT_MAGIC=100001
+MT5_DEFAULT_COMMENT=FinRL-X
 
 # Web Interface Settings
 WEB_HOST=0.0.0.0

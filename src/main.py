@@ -4,6 +4,7 @@ FinRL Trading Platform - Main Entry Point
 ========================================
 
 Command-line interface for the FinRL trading platform.
+Supports MT5 Enterprise System for full lifecycle management.
 """
 
 import argparse
@@ -28,6 +29,9 @@ Examples:
   python src/main.py dashboard    # Start web dashboard
   python src/main.py backtest     # Run backtest
   python src/main.py trade        # Execute live trading
+  python src/main.py trade --enterprise --strategy equal-weight --mode dry-run --symbols EURUSD GBPUSD
+  python src/main.py trade --all-in-one --strategy trend --mode dry-run --symbols EURUSD GBPUSD
+  python src/main.py trade --all-in-one --strategy pairs --mode dry-run
   python src/main.py data         # Manage data
         """
     )
@@ -48,6 +52,52 @@ Examples:
         '--verbose', '-v',
         action='store_true',
         help='Enable verbose logging'
+    )
+
+    # Enterprise / MT5 options
+    parser.add_argument(
+        '--enterprise', '-e',
+        action='store_true',
+        help='Use MT5EnterpriseSystem for full lifecycle management'
+    )
+    parser.add_argument(
+        '--strategy',
+        type=str,
+        default='equal-weight',
+        choices=['ml', 'rl', 'adaptive', 'signal', 'equal-weight', 'momentum', 'bucket', 'trend', 'reversion', 'pairs'],
+        help='Trading strategy (default: equal-weight, requires --enterprise)'
+    )
+    parser.add_argument(
+        '--mode',
+        type=str,
+        default='dry-run',
+        choices=['live', 'paper', 'dry-run'],
+        help='Execution mode (default: dry-run, requires --enterprise)'
+    )
+    parser.add_argument(
+        '--symbols',
+        type=str,
+        nargs='+',
+        default=None,
+        help='Symbols to trade (space-separated, requires --enterprise)'
+    )
+    parser.add_argument(
+        '--account',
+        type=str,
+        default=None,
+        help='Account name for multi-account MT5 (requires --enterprise)'
+    )
+    parser.add_argument(
+        '--schedule',
+        type=str,
+        default=None,
+        choices=['daily', 'hourly', 'once'],
+        help='Run on a schedule (requires --enterprise)'
+    )
+    parser.add_argument(
+        '--all-in-one',
+        action='store_true',
+        help='Use all_in_one pipeline that wires all 10 strategies to MT5'
     )
 
     return parser
@@ -79,8 +129,31 @@ def main():
             backtest_main()
 
         elif args.command == 'trade':
-            from trading.trade_executor import main as trade_main
-            trade_main()
+            if args.all_in_one:
+                # Run with all_in_one pipeline
+                from trading.all_in_one import run_mt5_all_in_one
+                run_mt5_all_in_one(
+                    strategy_name=args.strategy,
+                    mode=args.mode,
+                    symbols=args.symbols,
+                    account_name=args.account,
+                    verbose=args.verbose,
+                    schedule=args.schedule,
+                )
+            elif args.enterprise:
+                # Run with MT5EnterpriseSystem
+                from run_trading import run_enterprise
+                run_enterprise(
+                    strategy_name=args.strategy,
+                    mode=args.mode,
+                    symbols=args.symbols,
+                    account_name=args.account,
+                    verbose=args.verbose,
+                    schedule=args.schedule,
+                )
+            else:
+                from trading.trade_executor import main as trade_main
+                trade_main()
 
         elif args.command == 'data':
             from data.data_processor import main as data_main

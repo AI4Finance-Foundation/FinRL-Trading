@@ -1,12 +1,14 @@
+import logging
 import pandas as pd
 from typing import Dict, Optional
 import pandas_market_calendars as mcal
-import pandas as pd
 import random 
 import numpy as np
 from strategies.strategylogger import StrategyLogger
 from strategies.universe_manager import UniverseManager
 from strategies.base_signal import BaseSignalEngine
+
+
 class ExecutionManager:
     def __init__(
         self,
@@ -18,38 +20,40 @@ class ExecutionManager:
         allow_short: bool = True,
         gross_leverage: float = 1.0,
         cooling_days: int = 0,
-        rebalance_freq: str = "D",  # "D"（日频）或者 "M"（月频）,"W"（周频），未来可扩展
+        rebalance_freq: str = "D",  # "D" (daily) or "M" (monthly), "W" (weekly), extensible
         logger: Optional[object] = None,
-        ratio: float = 1.0,           # 最大可用资金比例
-        seed: int = 42                # 固定随机性
+        ratio: float = 1.0,           # Maximum available capital ratio
+        seed: int = 42                # Random seed for reproducibility
     ):
         """
         Parameters
         ----------
         universe_mgr : UniverseManager
-            已初始化好的 UniverseManager，用于判断股票是否在池子
+            Initialized UniverseManager for determining stock universe membership
         max_positions : int
-            最大持仓股票数（按 |weight| > 0 计）
+            Maximum number of positions (counted by |weight| > 0)
         max_weight : float
-            单个股票最大绝对权重（如 0.2 = 20%）
+            Maximum absolute weight per stock (e.g., 0.2 = 20%)
         min_weight : float
-            单个股票最小非零绝对权重（如 0.05 = 5%），低于此绝对值直接视为 0
+            Minimum non-zero absolute weight per stock (e.g., 0.05 = 5%);
+            values below this threshold are treated as 0
         weight_step : float
-            每次调整权重的步长（如 0.05）
+            Step size for weight adjustments (e.g., 0.05)
         allow_short : bool
-            是否允许做空（weight < 0）
+            Whether to allow short positions (weight < 0)
         gross_leverage : float
-            组合总 |weight| 之和上限（如 1.0 = 100%）
+            Maximum total |weight| sum (e.g., 1.0 = 100%)
         cooling_days : int
-            冷静期天数：卖出 / 平仓后需要等待的交易日数，期间禁止重新开仓
+            Cooling-off period: number of trading days to wait after closing
+            a position before re-opening
         rebalance_freq : str
-            调仓频率：
-              - "D"：每日调仓
-              - "M"：每月调仓（默认用月内第二个交易日）
-              - "W"：每周调仓（默认用周内第一个交易日）
-              - 可预留扩展 "W"、"intraday" 等
+            Rebalance frequency:
+              - "D": Daily rebalance
+              - "M": Monthly rebalance (uses the 2nd trading day of the month)
+              - "W": Weekly rebalance (uses the 1st trading day of the week)
+              - Extensible to "intraday" etc.
         logger : object or None
-            可选日志对象，需实现 log_signal(...)
+            Optional logger implementing log_signal(...)
         """
         self.universe_mgr = universe_mgr
         self.max_positions = int(max_positions)
@@ -64,13 +68,13 @@ class ExecutionManager:
         self.ratio = ratio
         random.seed(seed)
 
-        # 当前目标权重：tic_name -> weight (可为负，表示空头)
+        # Current target weights: tic_name -> weight (can be negative for short)
         self.current_weights: Dict[str, float] = {}
 
-        # 冷静期计数器：tic_name -> 剩余冷静天数
+        # Cooldown counter: tic_name -> remaining cooldown days
         self.cooldown: Dict[str, int] = {}
 
-        # 上一日日期，用于 close-only 判断
+        # Previous date, used for close-only determination
         self.prev_date: Optional[pd.Timestamp] = None
 
     def set_rebalance_frequency(self, freq: str):
@@ -78,59 +82,59 @@ class ExecutionManager:
         freq: 'D' / 'W' / 'M'
         """
         self.rebalance_freq = freq.upper()
+    
     # =========================================================
-    # 公共主入口：根据 signal_df 生成全历史权重矩阵
+    # Main public entry: generate full historical weight matrix from signal_df
     # =========================================================
     def generate_weight_matrix(self, signal_df: pd.DataFrame) -> pd.DataFrame:
         """
-        generate a weight matrix (index=date, columns=tic_name, value=weight)
+        Generate a weight matrix (index=date, columns=tic_name, value=weight)
         based on the daily signal_df (index=date, columns=tic_name, value=-1/0/1)
 
         Parameters
         ----------
         signal_df : pd.DataFrame
-            index：日期（DatetimeIndex 或可转为 Timestamp）
-            columns：tic_name
-            values：-1 / 0 / 1
+            index: Date (DatetimeIndex or convertible to Timestamp)
+            columns: tic_name
+            values: -1 / 0 / 1
 
         Returns
         -------
         weights_df : pd.DataFrame
-            index：日期
-            columns：tic_name
-            values：权重（float）
+            index: Date
+            columns: tic_name
+            values: Weight (float)
         """
         dates = sorted(pd.to_datetime(signal_df.index.unique()))
         all_tics = sorted(signal_df.columns.unique())
 
         records = []
 
-
         for dt in dates:
-            # get the signal of the day
+            # Get the signal for the day
             row = signal_df.loc[dt]
             if isinstance(row, pd.DataFrame):
-                # if there are multiple rows (uncommon), take the first row
+                # If there are multiple rows (uncommon), take the first row
                 signal_series = row.iloc[0]
             else:
                 signal_series = row
 
             self.step(dt, signal_series)
 
-            # record the weights of the day
+            # Record the weights for the day
             row_weights = {tic: self.current_weights.get(tic, 0.0) for tic in all_tics}
             row_weights["date"] = pd.Timestamp(dt)
             records.append(row_weights)
-        #  calculate the target weight matrix
 
+        # Calculate the target weight matrix
         weights_df = pd.DataFrame(records).set_index("date").sort_index()
 
         if hasattr(self, "_compute_target_weights"):
             try:
                 target_df = self._compute_target_weights(signal_df)
-                # align the index and columns (take the intersection to avoid column inconsistency)
+                # Align the index and columns (take the intersection to avoid column inconsistency)
                 target_df = target_df.reindex_like(weights_df).fillna(0.0)
-                # use the target weights to cover the current weights matrix
+                # Use the target weights to override the current weights matrix
                 weights_df.update(target_df)
                 if self.logger:
                     self.logger.log_info("[ExecutionManager] Applied _compute_target_weights successfully.")
@@ -142,13 +146,13 @@ class ExecutionManager:
 
         return weights_df
 
-    # frequency control of rebalance
+    # Frequency control of rebalance
     def _should_rebalance(self, date: pd.Timestamp) -> bool:
         """
-        based on the rebalance_freq, determine if the current date needs to rebalance.
-        currently supported:
-          - "D"：Day 
-          - "M"：Month 
+        Based on the rebalance_freq, determine if the current date needs rebalancing.
+        Currently supported:
+          - "D": Day
+          - "M": Month
         """
         date = pd.Timestamp(date)
 
@@ -157,7 +161,7 @@ class ExecutionManager:
 
         if self.rebalance_freq == "W":
             cal = self.universe_mgr.trading_calendar
-            # find the trading days of the week
+            # Find the trading days of the week
             week_dates = [d for d in cal
                           if d.isocalendar()[1] == date.isocalendar()[1]
                           and d.year == date.year]
@@ -172,7 +176,7 @@ class ExecutionManager:
             if not month_dates:
                 return False
             month_dates = sorted(month_dates)
-            # 第二个交易日 & 月末最后一个交易日
+            # 2nd trading day and last trading day of the month
             second_day = month_dates[1] if len(month_dates) >= 2 else month_dates[0]
             last_day = month_dates[-1]
             return date.normalize() in [
@@ -180,10 +184,10 @@ class ExecutionManager:
                 pd.Timestamp(last_day).normalize()
             ]
 
-    # daily execution logic: update self.current_weights
+    # Daily execution logic: update self.current_weights
     def step(self, date, signal_series: pd.Series):
         """
-        single day execution logic:
+        Single day execution logic:
           1. Decrement cooldown period for each stock.
           2. Check if today is a rebalance day based on the strategy's settings.
           3. If today is a rebalance day:
@@ -193,25 +197,25 @@ class ExecutionManager:
         date = pd.Timestamp(date)
         signals = signal_series.to_dict()  # tic -> -1/0/1
 
-        #  decrement the cooldown period for each stock
+        # Decrement the cooldown period for each stock
         for tic in list(self.cooldown.keys()):
             if self.cooldown[tic] > 0:
                 self.cooldown[tic] -= 1
 
-        #  update prev_date (for close-only judgment)
+        # Update prev_date (for close-only judgment)
         prev_date = self.prev_date
         self.prev_date = date
 
-        # if not a rebalance day, do not change the weights (cooldown period still decrements)
+        # If not a rebalance day, do not change the weights (cooldown period still decrements)
         if not self._should_rebalance(date):
             return
 
-        # the universe of stocks that are allowed to open new positions today
+        # The universe of stocks that are allowed to open new positions today
         today_universe = self.universe_mgr.get_universe(date)
 
         current_positions = {tic for tic, w in self.current_weights.items() if abs(w) > 0}
 
-        # all the stocks that need to be considered: have signal or have positions
+        # All stocks that need to be considered: have signal or have positions
         all_tics = sorted(set(signals.keys()) | current_positions)
 
         new_weights = self.current_weights.copy()
@@ -220,7 +224,7 @@ class ExecutionManager:
             old_w = float(self.current_weights.get(tic, 0.0))
             sig = int(signals.get(tic, 0))
 
-            # cooldown status
+            # Cooldown status
             cd = int(self.cooldown.get(tic, 0))
             has_pos = abs(old_w) > 0
 
@@ -229,25 +233,25 @@ class ExecutionManager:
             if prev_date is not None:
                 in_uni_yday = self.universe_mgr.is_in_universe(tic, prev_date)
 
-            # close-only: yesterday in the pool & today not in the pool & still have positions
+            # Close-only: yesterday in the pool & today not in the pool & still have positions
             close_only = in_uni_yday and (not in_uni_today) and has_pos
 
-            # if no positions and in cooldown period, do not open new positions (regardless of the signal)
+            # If no positions and in cooldown period, do not open new positions (regardless of the signal)
             if (not has_pos) and cd > 0:
                 effective_sig = 0
             else:
                 effective_sig = sig
 
-            # decide the target direction today (0/+1/-1)
+            # Decide the target direction today (0/+1/-1)
             if effective_sig == 0:
-                # signal is 0: immediately close
+                # Signal is 0: immediately close
                 new_w = 0.0
 
             elif close_only:
-                # close-only: do not open new positions; only keep the original position
-                # if the signal turns to 0, close (already covered above)
+                # Close-only: do not open new positions; only keep the original position
+                # If the signal turns to 0, close (already covered above)
                 new_w = old_w
-                print(f"[CLOSE-ONLY] {tic} keep position {old_w:.2f} (still have positions in the pool)")
+                logging.getLogger(f"{__name__}.{self.__class__.__name__}").info(f"[CLOSE-ONLY] {tic} keep position {old_w:.2f} (still have positions in the pool)")
 
             elif effective_sig > 0 and in_uni_today:
                 target_sign = 1
@@ -258,21 +262,21 @@ class ExecutionManager:
             elif effective_sig < 0 and in_uni_today and self.allow_short:
                 target_sign = -1
                 new_w = self._update_weight_one_name(
-                    old_weight=old_w, target_sign=target_sign, close_only=False,target_weight=self.max_weight, 
+                    old_weight=old_w, target_sign=target_sign, close_only=False, target_weight=self.max_weight, 
                 )
 
             else:
-                # not in the universe today & no positions → force 0
+                # Not in the universe today & no positions -> force 0
                 new_w = 0.0
 
-            # update the weight of the day
+            # Update the weight for the day
             new_weights[tic] = new_w
 
-            # if the position changes from non-zero to 0 → start the cooldown period
+            # If the position changes from non-zero to 0 -> start the cooldown period
             if (abs(old_w) > 0) and (abs(new_w) == 0) and (self.cooling_days > 0):
                 self.cooldown[tic] = self.cooling_days
 
-            # log
+            # Log
             if self.logger is not None:
                 if abs(old_w - new_w) > 1e-8:
                     action = "HOLD"
@@ -296,19 +300,19 @@ class ExecutionManager:
                         cooldown_left=self.cooldown.get(tic, 0),
                     )
 
-        # ========= portfolio level constraints =========
+        # ========= Portfolio level constraints =========
 
-        # 1) limit the number of positions
+        # 1) Limit the number of positions
         nz = [(tic, w) for tic, w in new_weights.items() if abs(w) > 0]
         if len(nz) > self.max_positions:
-            # sort by |weight| in descending order, keep the top max_positions
+            # Sort by |weight| in descending order, keep the top max_positions
             nz_sorted = sorted(nz, key=lambda x: abs(x[1]), reverse=True)
             keep = {tic for tic, _ in nz_sorted[: self.max_positions]}
             for tic, w in nz:
                 if tic not in keep:
                     new_weights[tic] = 0.0
 
-        # 2) limit the total leverage (by the sum of absolute values)
+        # 2) Limit the total leverage (by the sum of absolute values)
         gross = sum(abs(w) for w in new_weights.values())
         if gross > 0 and gross > self.gross_leverage:
             scale = self.gross_leverage / gross
@@ -317,7 +321,7 @@ class ExecutionManager:
 
         self.current_weights = new_weights
 
-    # single stock weight adjustment logic
+    # Single stock weight adjustment logic
     def _update_weight_one_name(
         self,
         old_weight: float,
@@ -327,49 +331,80 @@ class ExecutionManager:
     ) -> float:
         w = float(old_weight)
 
-        # in close-only mode, only reduce the position
+        # In close-only mode, only reduce the position
         if close_only and target_sign != 0:
-            return w  # do not open new positions
+            return w  # Do not open new positions
 
         if target_sign == 0:
-            # immediately close
+            # Immediately close
             return 0.0
 
-        # open new positions or add positions or flip positions: directly set the target position
+        # Open new positions or add positions or flip positions: directly set the target position
         return target_sign * target_weight
 
     def _apply_min_weight_threshold(self, w: float) -> float:
         """
-            when the absolute value is less than min_weight, directly treat it as 0 (close),
-            to prevent "dirty positions" like 0.01.
+        When the absolute value is less than min_weight, directly treat it as 0 (close),
+        to prevent "dirty positions" like 0.01.
         """
         if abs(w) < self.min_weight:
             return 0.0
         return w
-    def _compute_target_weights(self, signal_df: pd.DataFrame) -> pd.DataFrame:
+
+    def _compute_target_weights(self, signal_df: pd.DataFrame, 
+                                max_weight: Optional[float] = None,
+                                min_weight: Optional[float] = None,
+                                ratio: Optional[float] = None,
+                                max_positions: Optional[int] = None,
+                                seed: Optional[int] = None) -> pd.DataFrame:
         """
-        根据 signal_df 计算目标权重矩阵，遵守以下约束：
-        1. 单股最大仓位 ≤ 20%
-        2. 单股最小仓位 ≥ 2%
-        3. 卖空仓位也计算在总仓位中（取绝对值）
-        4. ratio 控制总可用仓位比例（默认 1.0）
-        5. 最多 20 只股票（超出则随机抽取）
-        6. 新股票只用剩余仓位买入，不调整已有仓位
-        7. 每月最后一个交易日做等权 Rebalance
+        Compute the target weight matrix from signal_df, subject to the following constraints:
+        1. Single stock max position <= max_weight (default 20%)
+        2. Single stock min position >= min_weight (default 2%)
+        3. Short positions count toward total position (absolute value)
+        4. ratio controls total available position ratio (default 1.0)
+        5. Max positions limit (default 20, excess randomly sampled)
+        6. New stocks only use remaining capacity, don't adjust existing positions
+        7. Last trading day of each month: equal-weight rebalance
+
+        Parameters
+        ----------
+        signal_df : pd.DataFrame
+            Signal DataFrame with index=date, columns=tic_name, values=-1/0/1
+        max_weight : float, optional
+            Override for max_weight per stock
+        min_weight : float, optional
+            Override for min_weight per stock
+        ratio : float, optional
+            Override for available capital ratio
+        max_positions : int, optional
+            Override for max positions
+        seed : int, optional
+            Random seed for reproducibility (default uses self seed)
+
+        Returns
+        -------
+        weights_target : pd.DataFrame
+            Target weight matrix with index=date, columns=tic_name, values=weights
         """
-        random.seed(42)
-        max_weight = self.max_weight
-        min_weight = self.min_weight
-        ratio = getattr(self, "ratio", 1.0)
-        max_positions = self.max_positions
+        # Use instance defaults if not overridden
+        if max_weight is None:
+            max_weight = self.max_weight
+        if min_weight is None:
+            min_weight = self.min_weight
+        if ratio is None:
+            ratio = getattr(self, "ratio", 1.0)
+        if max_positions is None:
+            max_positions = self.max_positions
+        if seed is not None:
+            random.seed(seed)
 
         dates = sorted(pd.to_datetime(signal_df.index.unique()))
         all_tics = signal_df.columns
         weights_target = pd.DataFrame(index=dates, columns=all_tics, dtype=float).fillna(0.0)
 
         current_holdings = set()
-        last_weights = pd.Series(0.0, index=all_tics)   #
-
+        last_weights = pd.Series(0.0, index=all_tics)
 
         for date in dates:
             cal = self.universe_mgr.trading_calendar
@@ -378,13 +413,13 @@ class ExecutionManager:
                 continue
             month_dates = sorted(month_dates)
 
-            # 第二个交易日与月底
+            # 2nd trading day and last day of the month
             signal_day = month_dates[1] if len(month_dates) >= 2 else month_dates[0]
             last_day = month_dates[-1]
             is_signal_day = date.normalize() == pd.Timestamp(signal_day).normalize()
             is_month_end = date.normalize() == pd.Timestamp(last_day).normalize()
 
-            # --- 每月第二个交易日：根据信号建仓 ---
+            # --- 2nd trading day of each month: build positions based on signals ---
             if is_signal_day:
                 row = signal_df.loc[date] if date in signal_df.index else None
                 if row is None:
@@ -408,7 +443,7 @@ class ExecutionManager:
                 weights_target.loc[date] = last_weights
                 current_holdings = set(active_tics)
 
-            # --- 月底 Rebalance ---
+            # --- End of month Rebalance ---
             elif is_month_end and len(current_holdings) > 0:
                 equal_w = min(max_weight, max(min_weight, ratio / len(current_holdings)))
                 new_weights = pd.Series(0.0, index=all_tics)
@@ -419,10 +454,10 @@ class ExecutionManager:
                 last_weights = new_weights.copy()
                 weights_target.loc[date] = last_weights
 
-            # --- 其他日期：延续上次仓位 ---
+            # --- Other dates: carry forward last positions ---
             else:
                 weights_target.loc[date] = last_weights
 
-        # 最后再清理
+        # Final cleanup
         weights_target = weights_target.fillna(0.0)
         return weights_target
