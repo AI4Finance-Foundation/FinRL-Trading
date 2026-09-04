@@ -82,6 +82,81 @@ class MLStockSelectionStrategy(BaseStrategy):
         """
         super().__init__(config)
 
+    def apply_risk_limits(self, weights_df: pd.DataFrame) -> pd.DataFrame:
+        """Apply position and sector concentration limits and renormalize.
+
+        Caps the weight of any single stock at ``max_weight_per_stock`` and,
+        when a ``sector`` column is present, the aggregate weight of any
+        sector at ``max_sector_weight``. Weight freed by a cap is redistributed
+        proportionally to the remaining under-cap names/sectors, and the
+        portfolio is renormalized so it still sums to 1 whenever the caps are
+        feasible. Limits default to the values in
+        :class:`~src.config.settings.StrategySettings` and can be overridden
+        through ``self.config`` attributes.
+        """
+        if weights_df is None or len(weights_df) == 0 or 'weight' not in weights_df.columns:
+            return weights_df
+
+        max_weight_per_stock = float(getattr(self.config, 'max_weight_per_stock', 0.1))
+        max_sector_weight = float(getattr(self.config, 'max_sector_weight', 0.3))
+
+        weights_df = weights_df.copy()
+        total = weights_df['weight'].sum()
+        if total is None or total == 0:
+            return weights_df
+
+        # Normalize to 1 so caps are comparable across calls.
+        weights_df['weight'] = weights_df['weight'] / total
+
+        has_sector = 'sector' in weights_df.columns
+        for _ in range(50):
+            changed = False
+
+            # Sector-level cap: scale over-cap sectors down and redistribute
+            # the freed weight to under-cap sectors by remaining room.
+            if has_sector:
+                sec_tot = weights_df.groupby('sector', observed=True)['weight'].transform('sum')
+                over_sec = sec_tot > max_sector_weight
+                if over_sec.any():
+                    changed = True
+                    weights_df.loc[over_sec, 'weight'] *= max_sector_weight / sec_tot[over_sec]
+                    under_sec = ~over_sec
+                    if under_sec.any():
+                        under_tot = weights_df.loc[under_sec].groupby(
+                            'sector', observed=True
+                        )['weight'].transform('sum')
+                        room = (max_sector_weight - under_tot).clip(lower=0)
+                        freed = float((sec_tot[over_sec] - max_sector_weight).sum())
+                        room_sum = float(room.sum())
+                        if room_sum > 0 and freed > 0:
+                            nonzero = under_tot > 0
+                            # Allocation per sector is proportional to its
+                            # remaining room, never exceeding that room.
+                            boost = np.minimum(
+                                freed * room / room_sum, room
+                            )
+                            factor = pd.Series(1.0, index=under_tot.index)
+                            factor[nonzero] = 1.0 + boost[nonzero] / under_tot[nonzero]
+                            weights_df.loc[under_sec, 'weight'] *= factor.values
+
+            # Per-stock cap: redistribute excess proportionally.
+            over_stock = weights_df['weight'] > max_weight_per_stock
+            if over_stock.any():
+                changed = True
+                excess = float((weights_df.loc[over_stock, 'weight'] - max_weight_per_stock).sum())
+                weights_df.loc[over_stock, 'weight'] = max_weight_per_stock
+                below = ~over_stock
+                below_sum = float(weights_df.loc[below, 'weight'].sum())
+                if below.any() and below_sum > 0:
+                    weights_df.loc[below, 'weight'] += excess * (
+                        weights_df.loc[below, 'weight'] / below_sum
+                    )
+
+            if not changed:
+                break
+
+        return weights_df
+
     def _compute_min_variance_weights(self, 
                                      selected_gvkeys: List[str], 
                                      price_data: pd.DataFrame,
