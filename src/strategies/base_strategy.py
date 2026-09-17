@@ -46,6 +46,6 @@ def create_strategy(strategy_type, config):
     }
 
     strategy_class = strategies.get(strategy_type)
-    if strategy_class == None:
+    if strategy_class is None:
         raise ValueError(f"Unknown strategy type: {strategy_type}")
     return strategy_class(config)
