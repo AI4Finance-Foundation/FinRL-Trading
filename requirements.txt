@@ -12,7 +12,7 @@ plotly>=5.15.0
 seaborn>=0.12.0
 
 # Web framework
-streamlit>=1.28.0
+streamlit>=1.54.0
 
 # Financial data sources
 yfinance>=0.2.0
