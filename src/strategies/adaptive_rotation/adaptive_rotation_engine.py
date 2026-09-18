@@ -147,7 +147,7 @@ class AdaptiveRotationEngine:
         
         # Ranking
         self.intra_group_ranker = IntraGroupRanker(
-            lookback_weeks=self.config.ranking.top_n_per_group,  # Use config value
+            lookback_weeks=self.config.ranking.zscore_window or 12,
             robust=self.config.ranking.robust
         )
         
