@@ -28,7 +28,7 @@ pandas-market-calendars>=4.3.0
 # Alternative: exchange-calendars>=4.2.0  # Uncomment if you prefer exchange-calendars
 
 # Professional backtesting
-bt>=1.2.0
+# bt>=1.2.0  # Requires Microsoft C++ Build Tools — install separately
 
 # Configuration and validation
 pydantic>=2.5.0
@@ -41,7 +41,7 @@ sqlalchemy>=2.0.0
 pathlib>=1.0.1
 typing-extensions>=4.8.0
 lxml>=4.9.0  # For pandas.read_html
-finnhub>=2.4.19
+finnhub-python>=2.4.19
 
 # Development and testing
 pytest>=7.4.0
@@ -51,7 +51,7 @@ flake8>=6.1.0
 mypy>=1.7.0
 
 # Optional: Deep learning capabilities
-torch>=2.0.0
+# torch>=2.0.0  # Optional: install separately if you need deep reinforcement learning
 
 # Documentation
 sphinx>=7.2.0
