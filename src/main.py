@@ -75,15 +75,37 @@ def main():
             dashboard_main()
 
         elif args.command == 'backtest':
-            from backtest.backtest_engine import main as backtest_main
+            try:
+                from backtest.backtest_engine import main as backtest_main
+            except ImportError:
+                logger.error(
+                    "backtest_engine has no CLI main(); use "
+                    "'./deploy.sh --mode backtest' or "
+                    "'python src/strategies/run_adaptive_rotation_strategy.py --backtest'."
+                )
+                sys.exit(2)
             backtest_main()
 
         elif args.command == 'trade':
-            from trading.trade_executor import main as trade_main
+            try:
+                from trading.trade_executor import main as trade_main
+            except ImportError:
+                logger.error(
+                    "trade_executor has no CLI main(); see the live-trading "
+                    "examples in the repository instead."
+                )
+                sys.exit(2)
             trade_main()
 
         elif args.command == 'data':
-            from data.data_processor import main as data_main
+            try:
+                from data.data_processor import main as data_main
+            except ImportError:
+                logger.error(
+                    "data_processor has no CLI main(); use the scripts under "
+                    "'src/data/' or 'deploy.sh download-data' instead."
+                )
+                sys.exit(2)
             data_main()
 
         elif args.command == 'config':
@@ -103,6 +125,27 @@ def main():
             import traceback
             traceback.print_exc()
         sys.exit(1)
+
+
+def _run_command(command: str):
+    """Invoke a subcommand from a console-script entry point."""
+    sys.argv = [sys.argv[0], command] + sys.argv[1:]
+    return main()
+
+
+def main_dashboard():
+    """Console entry point for the Streamlit dashboard."""
+    return _run_command("dashboard")
+
+
+def main_backtest():
+    """Console entry point for the backtest CLI."""
+    return _run_command("backtest")
+
+
+def main_trade():
+    """Console entry point for trade execution."""
+    return _run_command("trade")
 
 
 if __name__ == "__main__":
