@@ -99,10 +99,10 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "finrl=src.main:main",
-            "finrl-dashboard=src.main:main_dashboard",
-            "finrl-backtest=src.main:main_backtest",
-            "finrl-trade=src.main:main_trade",
+            "finrl=main:main",
+            "finrl-dashboard=main:main_dashboard",
+            "finrl-backtest=main:main_backtest",
+            "finrl-trade=main:main_trade",
         ],
     },
     include_package_data=True,

@@ -41,7 +41,9 @@ sqlalchemy>=2.0.0
 pathlib>=1.0.1
 typing-extensions>=4.8.0
 lxml>=4.9.0  # For pandas.read_html
-finnhub>=2.4.19
+pyyaml>=6.0  # Required by deploy.sh and strategy config loaders
+finnhub-python>=2.4.19  # Correct PyPI name (module: finnhub); the old "finnhub" package does not exist
+tzlocal>=5.0  # Required by src/data/trading_calendar.py
 
 # Development and testing
 pytest>=7.4.0
